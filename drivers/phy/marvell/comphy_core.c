@@ -11,7 +11,7 @@
 #include <linux/errno.h>
 #include <asm/io.h>
 
-#include "comphy.h"
+#include "comphy_core.h"
 
 #define COMPHY_MAX_CHIP 4
 
@@ -64,6 +64,10 @@ void comphy_print(struct chip_serdes_phy_config *chip_cfg,
 			       get_speed_string(comphy_map_data->speed));
 		}
 	}
+}
+
+__weak void board_update_comphy_map(struct comphy_map *serdes_map, int count)
+{
 }
 
 static int comphy_probe(struct udevice *dev)
@@ -142,6 +146,8 @@ static int comphy_probe(struct udevice *dev)
 
 		lane++;
 	}
+
+	board_update_comphy_map(comphy_map_data, chip_cfg->comphy_lanes_count);
 
 	/* Save CP index for MultiCP devices (A8K) */
 	chip_cfg->cp_index = current_idx++;
