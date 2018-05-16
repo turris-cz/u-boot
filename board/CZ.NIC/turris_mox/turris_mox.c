@@ -8,6 +8,7 @@
 #include <clk.h>
 #include <spi.h>
 #include <linux/string.h>
+#include <comphy.h>
 
 #ifdef CONFIG_WDT_ARMADA_3720
 #include <wdt.h>
@@ -53,14 +54,20 @@ int board_init(void)
 	return 0;
 }
 
-int last_stage_init(void)
+static int mox_read_topology(const u8 **ptopology, int *psize)
 {
+	static u8 topology[9];
+	static int size = 0;
 	struct spi_slave *slave;
 	struct udevice *dev;
 	u8 din[10], dout[10];
 	int ret, i;
-	size_t len = 0;
-	char module_topology[128];
+
+	if (size) {
+		*ptopology = topology;
+		*psize = size;
+		return 0;
+	}
 
 	ret = spi_get_bus_and_cs(0, 1, 20000000, SPI_CPHA, "spi_generic_drv",
 				 "mox-modules@1", &dev, &slave);
@@ -78,30 +85,87 @@ int last_stage_init(void)
 	if (ret)
 		goto fail_release;
 
-	if (din[0] != 0x00 && din[0] != 0xff)
+	if (din[0] != 0x00 && din[0] != 0xff) {
+		ret = -ENODEV;
 		goto fail_release;
+	}
+
+	for (i = 1; i < 10 && din[i] != 0xff; ++i)
+		topology[i-1] = din[i] & 0xf;
+	size = i-1;
+
+	*ptopology = topology;
+	*psize = size;
+
+fail_release:
+	spi_release_bus(slave);
+fail_free:
+	spi_free_slave(slave);
+fail:
+	return ret;
+}
+
+void board_update_comphy_map(struct comphy_map *serdes_map, int count)
+{
+	int ret, i, size, has = 0;
+	const u8 *topology;
+
+	ret = mox_read_topology(&topology, &size);
+	if (ret)
+		return;
+
+	for (i = 0; i < size; ++i) {
+		if (has && (topology[i] == 0x1 || topology[i] == 0x3)) {
+			printf("Warning: two or more incompatible Mox modules "
+			       "found, using only first!\n");
+			break;
+		} else if (topology[i] == 0x1) {
+			printf("SFP module found, changing SERDES lane 0 speed"
+			       " to 1.25 Gbps\n");
+			serdes_map[0].speed = PHY_SPEED_1_25G;
+			has = topology[i];
+		} else if (topology[i] == 0x3) {
+			printf("Topaz Switch module found, changing SERDES lane"
+			       " 0 speed to 3.125 Gbps\n");
+			serdes_map[0].speed = PHY_SPEED_3_125G;
+			has = topology[i];
+		}
+	}
+}
+
+int last_stage_init(void)
+{
+	int ret, i, size;
+	size_t len = 0;
+	const u8 *topology;
+	char module_topology[128];
+
+	ret = mox_read_topology(&topology, &size);
+	if (ret) {
+		printf("Cannot read module topology!\n");
+		return 0;
+	}
 
 	printf("Module Topology:\n");
-	for (i = 1; i < 10 && din[i] != 0xff; ++i) {
-		u8 mid = din[i] & 0xf;
+	for (i = 0; i < size; ++i) {
 		size_t mlen;
 		const char *mname = "";
 
-		switch (mid) {
+		switch (topology[i]) {
 		case 0x1:
 			mname = "sfp-";
-			printf("% 4i: SFP Module\n", i);
+			printf("% 4i: SFP Module\n", i+1);
 			break;
 		case 0x2:
 			mname = "pci-";
-			printf("% 4i: Mini-PCIe Module\n", i);
+			printf("% 4i: Mini-PCIe Module\n", i+1);
 			break;
 		case 0x3:
 			mname = "topaz-";
-			printf("% 4i: Topaz Switch Module\n", i);
+			printf("% 4i: Topaz Switch Module\n", i+1);
 			break;
 		default:
-			printf("% 4i: unknown (ID %i)\n", i, mid);
+			printf("% 4i: unknown (ID %i)\n", i+1, topology[i]);
 		}
 
 		mlen = strlen(mname);
@@ -116,12 +180,5 @@ int last_stage_init(void)
 
 	env_set("module_topology", module_topology);
 
-fail_release:
-	spi_release_bus(slave);
-fail_free:
-	spi_free_slave(slave);
-fail:
-	if (ret)
-		printf("Cannot read module topology!\n");
-	return ret;
+	return 0;
 }
