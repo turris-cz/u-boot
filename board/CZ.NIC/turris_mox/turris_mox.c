@@ -54,8 +54,16 @@ int board_init(void)
 	return 0;
 }
 
-static int mox_read_topology(const u8 **ptopology, int *psize)
+typedef enum {
+	MOX_UNKNOWN,
+	MOX_EMMC,
+	MOX_SD
+} mox_version_t;
+
+static int mox_read_topology(const u8 **ptopology, int *psize,
+			     mox_version_t *pversion)
 {
+	static mox_version_t mox_version;
 	static u8 topology[9];
 	static int size = 0;
 	struct spi_slave *slave;
@@ -64,8 +72,12 @@ static int mox_read_topology(const u8 **ptopology, int *psize)
 	int ret, i;
 
 	if (size) {
-		*ptopology = topology;
-		*psize = size;
+		if (ptopology)
+			*ptopology = topology;
+		if (psize)
+			*psize = size;
+		if (pversion)
+			*pversion = mox_version;
 		return 0;
 	}
 
@@ -85,7 +97,17 @@ static int mox_read_topology(const u8 **ptopology, int *psize)
 	if (ret)
 		goto fail_release;
 
-	if (din[0] != 0x00 && din[0] != 0xff) {
+	switch (din[0]) {
+	case 0x00:
+		mox_version = MOX_EMMC;
+		break;
+	case 0x10:
+		mox_version = MOX_SD;
+		break;
+	case 0xff:
+		mox_version = MOX_UNKNOWN;
+		break;
+	default:
 		ret = -ENODEV;
 		goto fail_release;
 	}
@@ -94,8 +116,12 @@ static int mox_read_topology(const u8 **ptopology, int *psize)
 		topology[i-1] = din[i] & 0xf;
 	size = i-1;
 
-	*ptopology = topology;
-	*psize = size;
+	if (ptopology)
+		*ptopology = topology;
+	if (psize)
+		*psize = size;
+	if (pversion)
+		*pversion = mox_version;
 
 fail_release:
 	spi_release_bus(slave);
@@ -110,7 +136,7 @@ void board_update_comphy_map(struct comphy_map *serdes_map, int count)
 	int ret, i, size, has = 0;
 	const u8 *topology;
 
-	ret = mox_read_topology(&topology, &size);
+	ret = mox_read_topology(&topology, &size, NULL);
 	if (ret)
 		return;
 
@@ -139,13 +165,17 @@ int last_stage_init(void)
 	size_t len = 0;
 	const u8 *topology;
 	char module_topology[128];
+	mox_version_t version;
 
-	ret = mox_read_topology(&topology, &size);
+	ret = mox_read_topology(&topology, &size, &version);
 	if (ret) {
 		printf("Cannot read module topology!\n");
 		return 0;
 	}
 
+	printf("Found Turris Mox %s version\n", version == MOX_SD ? "SD" :
+						version == MOX_EMMC ? "eMMC" :
+						"unknown");
 	printf("Module Topology:\n");
 	for (i = 0; i < size; ++i) {
 		size_t mlen;
@@ -179,6 +209,8 @@ int last_stage_init(void)
 	module_topology[len > 0 ? len - 1 : 0] = '\0';
 
 	env_set("module_topology", module_topology);
+	env_set("mox_version", version == MOX_SD ? "sd" :
+			       version == MOX_EMMC ? "emmc" : "");
 
 	return 0;
 }
