@@ -10,13 +10,13 @@
 #include <linux/string.h>
 #include <comphy.h>
 
-#ifdef CONFIG_WDT_ARMADA_3720
+#ifdef CONFIG_WDT_ARMADA_37XX
 #include <wdt.h>
 #endif
 
 DECLARE_GLOBAL_DATA_PTR;
 
-#ifdef CONFIG_WDT_ARMADA_3720
+#ifdef CONFIG_WDT_ARMADA_37XX
 static struct udevice *watchdog_dev;
 
 void watchdog_reset(void)
@@ -42,11 +42,11 @@ int board_init(void)
 	/* address of boot parameters */
 	gd->bd->bi_boot_params = CONFIG_SYS_SDRAM_BASE + 0x100;
 
-#ifdef CONFIG_WDT_ARMADA_3720
+#ifdef CONFIG_WDT_ARMADA_37XX
 	if (uclass_get_device(UCLASS_WDT, 0, &watchdog_dev)) {
-		printf("Cannot find Armada 3720 watchdog!\n");
+		printf("Cannot find Armada 37xx watchdog!\n");
 	} else {
-		printf("Enabling Armada 3720 watchdog (3 minutes timeout).\n");
+		printf("Enabling Armada 37xx watchdog (3 minutes timeout).\n");
 		wdt_start(watchdog_dev, 180000, 0);
 	}
 #endif
