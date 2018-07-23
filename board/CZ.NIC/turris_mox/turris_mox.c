@@ -155,6 +155,11 @@ void board_update_comphy_map(struct comphy_map *serdes_map, int count)
 			       " 0 speed to 3.125 Gbps\n");
 			serdes_map[0].speed = PHY_SPEED_3_125G;
 			has = topology[i];
+		} else if (topology[i] == 0x4) {
+			printf("Peridot Switch module found, changing SERDES lane"
+			       " 0 speed to 3.125 Gbps\n");
+			serdes_map[0].speed = PHY_SPEED_3_125G;
+			has = topology[i];
 		}
 	}
 }
@@ -179,6 +184,7 @@ int last_stage_init(void)
 	printf("Module Topology:\n");
 	for (i = 0; i < size; ++i) {
 		size_t mlen;
+		char defname[6] = "0x00-";
 		const char *mname = "";
 
 		switch (topology[i]) {
@@ -192,10 +198,20 @@ int last_stage_init(void)
 			break;
 		case 0x3:
 			mname = "topaz-";
-			printf("% 4i: Topaz Switch Module\n", i+1);
+			printf("% 4i: Topaz Switch Module (4-port)\n", i+1);
+			break;
+		case 0x4:
+			mname = "peridot-";
+			printf("% 4i: Peridot Switch Module (8-port)\n", i+1);
 			break;
 		default:
-			printf("% 4i: unknown (ID %i)\n", i+1, topology[i]);
+			if (topology[i] < 10)
+				defname[3] = '0' + topology[i];
+			else
+				defname[3] = 'A' + (topology[i] - 10);
+			mname = defname;
+			printf("% 4i: unknown (ID %i, name %s)\n", i+1,
+			       topology[i], mname);
 		}
 
 		mlen = strlen(mname);
