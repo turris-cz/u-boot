@@ -66,9 +66,9 @@ int board_fix_fdt(void *blob)
 	 * to read SPI by reading/writing SPI registers directly
 	 */
 
-	writel(0x563fa, ARMADA_37XX_NB_GPIO_SEL);
 	writel(0x10df, ARMADA_37XX_SPI_CFG);
-	writel(0x2005b, ARMADA_37XX_SPI_CTRL);
+	clrbits_le32(ARMADA_37XX_NB_GPIO_SEL, BIT(12));
+	setbits_le32(ARMADA_37XX_SPI_CTRL, BIT(17));
 
 	while (!(readl(ARMADA_37XX_SPI_CTRL) & 0x2))
 		udelay(1);
@@ -88,7 +88,7 @@ int board_fix_fdt(void *blob)
 
 	size = i;
 
-	writel(0x5b, ARMADA_37XX_SPI_CTRL);
+	clrbits_le32(ARMADA_37XX_SPI_CTRL, BIT(17));
 
 	if (size > 1 && (topology[1] == MOX_MODULE_PCI ||
 			 topology[1] == MOX_MODULE_USB3 ||
