@@ -42,10 +42,25 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
+static long mox_ram_size(void)
+{
+	switch ((readl(0xd0000200) >> 16) & 0x1f) {
+	case 0xd:
+		return 0x20000000;
+	case 0xe:
+		return 0x40000000;
+	case 0xf:
+	case 0x10:
+		return 0x80000000;
+	default:
+		return 0x20000000;
+	}
+}
+
 int dram_init(void)
 {
 	gd->ram_base = 0;
-	gd->ram_size = (phys_size_t)get_ram_size(0, 0x40000000);
+	gd->ram_size = (phys_size_t)get_ram_size(0, mox_ram_size());
 
 	return 0;
 }
