@@ -10,8 +10,6 @@
 
 #define CONFIG_SYS_BOOTM_LEN (64 << 20)
 
-#define CONFIG_LAST_STAGE_INIT
-
 /*
  * High Level Configuration Options (easy to change)
  */
@@ -61,10 +59,18 @@
 #define CONFIG_I2C_MV
 #define CONFIG_SYS_I2C_SLAVE		0x0
 
+#if defined(CONFIG_ENV_IS_IN_MMC)
+/* Environment is in eMMC */
+#define CONFIG_ENV_OFFSET		0x3f0000
+#define CONFIG_ENV_SIZE			(64 << 10)
+#define CONFIG_SYS_MMC_ENV_DEV		0
+#define CONFIG_SYS_MMC_ENV_PART		2
+#else
 /* Environment in SPI NOR flash */
 #define CONFIG_ENV_OFFSET		0x180000 /* as Marvell U-Boot version */
 #define CONFIG_ENV_SIZE			(64 << 10) /* 64KiB */
 #define CONFIG_ENV_SECT_SIZE		(64 << 10) /* 64KiB sectors */
+#endif
 
 /*
  * Ethernet Driver configuration
@@ -78,7 +84,6 @@
 
 #define BOOT_TARGET_DEVICES(func) \
 	func(MMC, mmc, 0) \
-	func(USB, usb, 0) \
 	func(PXE, pxe, na) \
 	func(DHCP, dhcp, na)
 
