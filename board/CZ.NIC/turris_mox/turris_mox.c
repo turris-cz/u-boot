@@ -102,12 +102,22 @@ int board_fix_fdt(void *blob)
 		return 0;
 	}
 
+	/*
+	 * For some reason the pci-aardvark driver in Linux always reports
+	 *    advk-pcie d0070000.pcie: link never came up
+	 * if the PCIe controller is probed in U-Boot.
+	 *
+	 * Temporarily disable PCIe probing in U-Boot until this issue is solved
+	 * in the pci-aardvark driver in U-Boot.
+	 */
+#if 0
 	if (fdt_setprop_string(blob, node, "status",
 			       enable ? "okay" : "disabled") < 0) {
 		printf("Cannot %s PCIe in U-Boot's device tree!\n",
 		       enable ? "enable" : "disable");
 		return 0;
 	}
+#endif
 
 	if (a3700_fdt_fix_pcie_regions(blob) < 0) {
 		printf("Cannot fix PCIe regions in U-Boot's device tree!\n");
