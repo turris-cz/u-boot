@@ -13,6 +13,7 @@
 #include <env.h>
 #include <fdt_support.h>
 #include <init.h>
+#include <led.h>
 #include <linux/libfdt.h>
 #include <linux/string.h>
 #include <miiphy.h>
@@ -41,6 +42,9 @@
 #define SFP_GPIO_PATH	"/soc/internal-regs@d0000000/spi@10600/moxtet@1/gpio@0"
 #define PCIE_PATH	"/soc/pcie@d0070000"
 #define SFP_PATH	"/sfp"
+#define RST_BTN_PATH	"/gpio-keys/reset"
+
+#define MOX_LED_LABEL	"mox:red:activity"
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -393,6 +397,61 @@ static void mox_print_info(void)
 		printf("Cannot read ECDSA Public Key\n");
 }
 
+/*
+ * default factory reset bootcommand on Mox tries to load the rescue image from
+ * SPI flash memory and boot it
+ */
+#define MOX_FACTORY_RESET_BOOTCMD \
+	"setenv bootargs \"console=ttyMV0,115200" \
+			" earlycon=ar3700_uart,0xd0012000\"; " \
+	"sf probe; " \
+	"sf read ${kernel_addr_r} 0x190000; " \
+	"lzmadec ${kernel_addr_r} ${ramdisk_addr_r}; " \
+	"bootm ${ramdisk_addr_r}"
+
+static void handle_reset_button(void)
+{
+	struct gpio_desc reset_button;
+	struct udevice *led = NULL;
+	int node, i;
+
+	if (led_get_by_label(MOX_LED_LABEL, &led)) {
+		printf("Cannot find LED device!\n");
+		return;
+	}
+
+	/* enable LED so that user knows that reset button is being read */
+	led_set_state(led, LEDST_ON);
+
+	node = fdt_path_offset(gd->fdt_blob, RST_BTN_PATH);
+	if (node < 0) {
+		printf("Cannot find RESET button device node!\n");
+		return;
+	}
+
+	if (gpio_request_by_name_nodev(offset_to_ofnode(node), "gpios", 0,
+				       &reset_button, GPIOD_IS_IN)) {
+		printf("Cannot get RESET button GPIO!\n");
+		return;
+	}
+
+	/* now check if user holds reset button for one second */
+	if (!dm_gpio_get_value(&reset_button))
+		return;
+
+	for (i = 0; i < 10; ++i) {
+		mdelay(100);
+		if (!dm_gpio_get_value(&reset_button))
+			return;
+	}
+
+	/* inform that rescue mode is being loaded by disabling LED */
+	led_set_state(led, LEDST_OFF);
+
+	printf("RESET button was pressed, overwriting bootcmd!\n");
+	env_set("bootcmd", MOX_FACTORY_RESET_BOOTCMD);
+}
+
 int last_stage_init(void)
 {
 	int ret, i;
@@ -539,6 +598,8 @@ int last_stage_init(void)
 	}
 
 	printf("\n");
+
+	handle_reset_button();
 
 	return 0;
 }
