@@ -22,6 +22,7 @@
 #include <asm/io.h>
 #include <dm/device_compat.h>
 #include <dm/devres.h>
+#include <generic-phy.h>
 #include <linux/errno.h>
 #include <phy.h>
 #include <miiphy.h>
@@ -274,6 +275,7 @@ struct mvneta_port {
 	unsigned int link;
 	unsigned int duplex;
 	unsigned int speed;
+	struct phy comphy;
 
 	int init;
 	int phyaddr;
@@ -1150,8 +1152,22 @@ static int mvneta_setup_txqs(struct mvneta_port *pp)
 	return 0;
 }
 
+static int mvneta_comphy_init(struct mvneta_port *pp)
+{
+	int ret;
+
+	ret = generic_phy_set_mode(&pp->comphy, PHY_MODE_ETHERNET,
+				   pp->phy_interface);
+	if (ret)
+		return ret;
+
+	return generic_phy_power_on(&pp->comphy);
+}
+
 static void mvneta_start_dev(struct mvneta_port *pp)
 {
+	mvneta_comphy_init(pp);
+
 	/* start the Rx/Tx activity */
 	mvneta_port_enable(pp);
 }
@@ -1723,6 +1739,12 @@ static int mvneta_probe(struct udevice *dev)
 	else
 		mvneta_conf_mbus_windows(pp);
 
+	ret = generic_phy_get_by_index(dev, 0, &pp->comphy);
+	if (ret && ret != -ENOENT) {
+		printf("cannot get comphy in mvneta\n");
+		return ret;
+	}
+
 	/* PHY interface is already decoded in mvneta_ofdata_to_platdata() */
 	pp->phy_interface = pdata->phy_interface;
 
@@ -1776,6 +1798,7 @@ static void mvneta_stop(struct udevice *dev)
 
 	mvneta_port_down(pp);
 	mvneta_port_disable(pp);
+	generic_phy_power_off(&pp->comphy);
 }
 
 static const struct eth_ops mvneta_ops = {
