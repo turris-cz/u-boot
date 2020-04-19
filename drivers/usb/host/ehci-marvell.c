@@ -19,6 +19,8 @@
 #include <asm/arch/orion5x.h>
 #endif
 
+#include "phy.h"
+
 DECLARE_GLOBAL_DATA_PTR;
 
 #define USB_WINDOW_CTRL(i)	(0x320 + ((i) << 4))
@@ -103,6 +105,7 @@ static int ehci_mvebu_probe(struct udevice *dev)
 	struct ehci_mvebu_priv *priv = dev_get_priv(dev);
 	struct ehci_hccr *hccr;
 	struct ehci_hcor *hcor;
+	int err;
 
 	/*
 	 * Get the base address for EHCI controller from the device node
@@ -125,6 +128,10 @@ static int ehci_mvebu_probe(struct udevice *dev)
 	else
 		usb_brg_adrdec_setup((void *)priv->hcd_base);
 
+	err = usb_phys_setup(dev);
+	if (err)
+		return err;
+
 	hccr = (struct ehci_hccr *)(priv->hcd_base + 0x100);
 	hcor = (struct ehci_hcor *)
 		((uintptr_t)hccr + HC_LENGTH(ehci_readl(&hccr->cr_capbase)));
@@ -133,8 +140,28 @@ static int ehci_mvebu_probe(struct udevice *dev)
 	      (uintptr_t)hccr, (uintptr_t)hcor,
 	      (uintptr_t)HC_LENGTH(ehci_readl(&hccr->cr_capbase)));
 
-	return ehci_register(dev, hccr, hcor, &marvell_ehci_ops, 0,
-			     USB_INIT_HOST);
+	err = ehci_register(dev, hccr, hcor, &marvell_ehci_ops, 0,
+			    USB_INIT_HOST);
+	if (err)
+		goto phy_err;
+
+	return 0;
+
+phy_err:
+	usb_phys_shutdown(dev);
+
+	return err;
+}
+
+static int ehci_mvebu_remove(struct udevice *dev)
+{
+	int ret;
+
+	ret = ehci_deregister(dev);
+	if (ret)
+		return ret;
+
+	return usb_phys_shutdown(dev);
 }
 
 static const struct udevice_id ehci_usb_ids[] = {
@@ -148,7 +175,7 @@ U_BOOT_DRIVER(ehci_mvebu) = {
 	.id	= UCLASS_USB,
 	.of_match = ehci_usb_ids,
 	.probe = ehci_mvebu_probe,
-	.remove = ehci_deregister,
+	.remove = ehci_mvebu_remove,
 	.ops	= &ehci_usb_ops,
 	.platdata_auto_alloc_size = sizeof(struct usb_platdata),
 	.priv_auto_alloc_size = sizeof(struct ehci_mvebu_priv),
