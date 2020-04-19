@@ -188,6 +188,35 @@
 				};
 			};
 
+			comphy: phy@18300 {
+				compatible = "marvell,comphy-a3700";
+				reg = <0x18300 0x300>,
+				      <0x1F000 0x400>,
+				      <0x5C000 0x400>,
+				      <0xe0178 0x8>;
+				reg-names = "comphy",
+					    "lane1_pcie_gbe",
+					    "lane0_usb3_gbe",
+					    "lane2_sata_usb3";
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				comphy0: phy@0 {
+					reg = <0>;
+					#phy-cells = <1>;
+				};
+
+				comphy1: phy@1 {
+					reg = <1>;
+					#phy-cells = <1>;
+				};
+
+				comphy2: phy@2 {
+					reg = <2>;
+					#phy-cells = <1>;
+				};
+			};
+
 			pinctrl_sb: pinctrl-sb@18800 {
 				compatible = "marvell,armada3710-sb-pinctrl",
 				"syscon", "simple-mfd";
@@ -229,14 +258,46 @@
 				compatible = "marvell,armada3700-xhci",
 				"generic-xhci";
 				reg = <0x58000 0x4000>;
+				marvell,usb-misc-reg = <&usb32_syscon>;
 				interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
+				phys = <&comphy0 0>, <&usb2_utmi_otg_phy>;
+				phy-names = "usb3-phy", "usb2-utmi-otg-phy";
 				status = "disabled";
+			};
+
+			usb2_utmi_otg_phy: phy@5d000 {
+				compatible = "marvell,a3700-utmi-otg-phy";
+				reg = <0x5d000 0x800>;
+				marvell,usb-misc-reg = <&usb32_syscon>;
+				#phy-cells = <0>;
+			};
+
+			usb32_syscon: system-controller@5d800 {
+				compatible = "marvell,armada-3700-usb2-host-device-misc",
+				"syscon";
+				reg = <0x5d800 0x800>;
 			};
 
 			usb2: usb@5e000 {
 				compatible = "marvell,armada3700-ehci";
 				reg = <0x5e000 0x450>;
+				marvell,usb-misc-reg = <&usb2_syscon>;
+				phys = <&usb2_utmi_host_phy>;
+				phy-names = "usb2-utmi-host-phy";
 				status = "disabled";
+			};
+
+			usb2_utmi_host_phy: phy@5f000 {
+				compatible = "marvell,a3700-utmi-host-phy";
+				reg = <0x5f000 0x800>;
+				marvell,usb-misc-reg = <&usb2_syscon>;
+				#phy-cells = <0>;
+			};
+
+			usb2_syscon: system-controller@5f800 {
+				compatible = "marvell,armada-3700-usb2-host-misc",
+				"syscon";
+				reg = <0x5f800 0x800>;
 			};
 
 			xor@60900 {
@@ -272,6 +333,7 @@
 				compatible = "marvell,armada-3700-ahci";
 				reg = <0xe0000 0x2000>;
 				interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
+				phys = <&comphy2 0>;
 				status = "disabled";
 			};
 
@@ -311,15 +373,6 @@
 				clocks = <&nb_periph_clk 7>;
 				status = "disabled";
 			};
-
-			comphy: comphy@18300 {
-				compatible = "marvell,mvebu-comphy", "marvell,comphy-armada-3700";
-				reg = <0x18300 0x28>,
-				      <0x1f300 0x3d000>;
-				mux-bitcount = <4>;
-				mux-lane-order = <1 0 2>;
-				max-lanes = <3>;
-			};
 		};
 
 		pcie0: pcie@d0070000 {
@@ -329,6 +382,7 @@
 			#size-cells = <2>;
 			device_type = "pci";
 			num-lanes = <1>;
+			phys = <&comphy1 0>;
 			status = "disabled";
 
 			bus-range = <0 0xff>;
