@@ -17,13 +17,14 @@
 #include <asm/gpio.h>
 #include <asm/io.h>
 #include <linux/compat.h>
+
 #include "ehci.h"
+#include "phy.h"
 
 struct msm_ehci_priv {
 	struct ehci_ctrl ctrl; /* Needed by EHCI */
 	struct usb_ehci *ehci; /* Start of IP core*/
 	struct ulpi_viewport ulpi_vp; /* ULPI Viewport */
-	struct phy phy;
 };
 
 static int msm_init_after_reset(struct ehci_ctrl *dev)
@@ -56,7 +57,7 @@ static int ehci_usb_probe(struct udevice *dev)
 	hcor = (struct ehci_hcor *)((phys_addr_t)hccr +
 			HC_LENGTH(ehci_readl(&(hccr)->cr_capbase)));
 
-	ret = ehci_setup_phy(dev, &p->phy, 0);
+	ret = usb_phys_setup(dev);
 	if (ret)
 		return ret;
 
@@ -81,7 +82,7 @@ static int ehci_usb_remove(struct udevice *dev)
 	/* Stop controller. */
 	clrbits_le32(&ehci->usbcmd, CMD_RUN);
 
-	ret = ehci_shutdown_phy(dev, &p->phy);
+	ret = usb_phys_shutdown(dev);
 	if (ret)
 		return ret;
 

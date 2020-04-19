@@ -8,6 +8,8 @@ obj-y += usb-uclass.o
 obj-$(CONFIG_SANDBOX) += usb-sandbox.o
 endif
 
+obj-$(CONFIG_PHY) += phy.o
+
 # ohci
 obj-$(CONFIG_USB_OHCI_NEW) += ohci-hcd.o
 obj-$(CONFIG_USB_ATMEL) += ohci-at91.o

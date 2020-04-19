@@ -12,11 +12,11 @@
 #include <asm/io.h>
 
 #include "ehci.h"
+#include "phy.h"
 
 /* Information about a USB port */
 struct ehci_pci_priv {
 	struct ehci_ctrl ehci;
-	struct phy phy;
 };
 
 #if CONFIG_IS_ENABLED(DM_USB)
@@ -29,7 +29,7 @@ static int ehci_pci_init(struct udevice *dev, struct ehci_hccr **ret_hccr,
 	int ret;
 	u32 cmd;
 
-	ret = ehci_setup_phy(dev, &priv->phy, 0);
+	ret = usb_phys_setup(dev);
 	if (ret)
 		return ret;
 
@@ -146,7 +146,7 @@ static int ehci_pci_remove(struct udevice *dev)
 	if (ret)
 		return ret;
 
-	return ehci_shutdown_phy(dev, &priv->phy);
+	return usb_phys_shutdown(dev);
 }
 
 static const struct udevice_id ehci_pci_ids[] = {
