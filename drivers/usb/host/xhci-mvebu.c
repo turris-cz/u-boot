@@ -14,6 +14,8 @@
 
 #include <usb/xhci.h>
 
+#include "phy.h"
+
 struct mvebu_xhci_platdata {
 	fdt_addr_t hcd_base;
 };
@@ -49,6 +51,10 @@ static int xhci_usb_probe(struct udevice *dev)
 	len = HC_LENGTH(xhci_readl(&ctx->hcd->cr_capbase));
 	hcor = (struct xhci_hcor *)((uintptr_t)ctx->hcd + len);
 
+	ret = usb_phys_setup(dev);
+	if (ret)
+		return ret;
+
 	ret = device_get_supply_regulator(dev, "vbus-supply", &regulator);
 	if (!ret) {
 		ret = regulator_set_enable(regulator, true);
@@ -62,6 +68,17 @@ static int xhci_usb_probe(struct udevice *dev)
 	board_xhci_enable(devfdt_get_addr_index(dev, 1));
 
 	return xhci_register(dev, ctx->hcd, hcor);
+}
+
+static int xhci_usb_remove(struct udevice *dev)
+{
+	int ret;
+
+	ret = xhci_deregister(dev);
+	if (ret)
+		return ret;
+
+	return usb_phys_shutdown(dev);
 }
 
 static int xhci_usb_ofdata_to_platdata(struct udevice *dev)
@@ -93,7 +110,7 @@ U_BOOT_DRIVER(usb_xhci) = {
 	.of_match = xhci_usb_ids,
 	.ofdata_to_platdata = xhci_usb_ofdata_to_platdata,
 	.probe = xhci_usb_probe,
-	.remove = xhci_deregister,
+	.remove = xhci_usb_remove,
 	.ops	= &xhci_usb_ops,
 	.platdata_auto_alloc_size = sizeof(struct mvebu_xhci_platdata),
 	.priv_auto_alloc_size = sizeof(struct mvebu_xhci),
