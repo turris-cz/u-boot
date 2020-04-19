@@ -112,9 +112,6 @@ static int comphy_probe(struct udevice *dev)
 		fdtdec_locate_array(blob, node, "mux-lane-order",
 				    chip_cfg->comphy_lanes_count);
 
-	if (device_is_compatible(dev, "marvell,comphy-armada-3700"))
-		chip_cfg->ptr_comphy_chip_init = comphy_a3700_init;
-
 	if (device_is_compatible(dev, "marvell,comphy-cp110"))
 		chip_cfg->ptr_comphy_chip_init = comphy_cp110_init;
 

@@ -7,7 +7,7 @@
 #define _COMPHY_CORE_H_
 
 #include <fdtdec.h>
-#include <mvebu/comphy.h>
+#include <dt-bindings/comphy/comphy_data.h>
 
 #if defined(DEBUG)
 #define debug_enter()	printf("----> Enter %s\n", __func__);
@@ -69,6 +69,14 @@
 
 #define MAX_LANE_OPTIONS			10
 #define MAX_UTMI_PHY_COUNT			3
+
+struct comphy_map {
+	u32 type;
+	u32 speed;
+	u32 invert;
+	bool clk_src;
+	bool end_point;
+};
 
 struct comphy_mux_options {
 	u32 type;
@@ -132,21 +140,6 @@ static inline void reg_set16(void __iomem *addr, u16 data, u16 mask)
 }
 
 /* SoC specific init functions */
-#ifdef CONFIG_ARMADA_3700
-int comphy_a3700_init(struct chip_serdes_phy_config *ptr_chip_cfg,
-		      struct comphy_map *serdes_map);
-#else
-static inline int comphy_a3700_init(struct chip_serdes_phy_config *ptr_chip_cfg,
-				    struct comphy_map *serdes_map)
-{
-	/*
-	 * This function should never be called in this configuration, so
-	 * lets return an error here.
-	 */
-	return -1;
-}
-#endif
-
 #ifdef CONFIG_ARMADA_8K
 int comphy_cp110_init(struct chip_serdes_phy_config *ptr_chip_cfg,
 		      struct comphy_map *serdes_map);
