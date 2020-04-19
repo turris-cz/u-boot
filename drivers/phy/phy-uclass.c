@@ -161,6 +161,17 @@ int generic_phy_power_off(struct phy *phy)
 	return ops->power_off ? ops->power_off(phy) : 0;
 }
 
+int generic_phy_set_mode(struct phy *phy, enum phy_mode mode, int submode)
+{
+	struct phy_ops const *ops;
+
+	if (!phy)
+		return 0;
+	ops = phy_dev_ops(phy->dev);
+
+	return ops->set_mode ? ops->set_mode(phy, mode, submode) : 0;
+}
+
 UCLASS_DRIVER(phy) = {
 	.id		= UCLASS_PHY,
 	.name		= "phy",
