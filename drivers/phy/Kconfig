@@ -217,6 +217,14 @@ config PHY_MTK_TPHY
 	  multi-ports is first version, otherwise is second veriosn,
 	  so you can easily distinguish them by banks layout.
 
+config PHY_MVEBU_A3700_COMPHY
+	tristate "Marvell A3700 comphy driver"
+	depends on PHY && ARMADA_3700
+	help
+	  This driver allows to control the comphy, a hardware block providing
+	  shared serdes PHYs on Marvell Armada 3700. Its serdes lanes can be
+	  used by various controllers: Ethernet, SATA, USB3, PCIe.
+
 config PHY_MVEBU_A3700_UTMI
 	bool "Marvell A3700 UTMI driver"
 	depends on PHY && ARMADA_3700
