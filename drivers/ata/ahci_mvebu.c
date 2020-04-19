@@ -6,6 +6,7 @@
 #include <common.h>
 #include <ahci.h>
 #include <dm.h>
+#include <generic-phy.h>
 
 /*
  * Dummy implementation that can be overwritten by a board
@@ -30,13 +31,47 @@ static int mvebu_ahci_bind(struct udevice *dev)
 	return 0;
 }
 
+static int mvebu_ahci_phy_power_on(struct udevice *dev)
+{
+	struct phy phy;
+	int ret;
+
+	ret = generic_phy_get_by_index(dev, 0, &phy);
+	if (ret == -ENOENT)
+		return 0;
+
+	ret = generic_phy_init(&phy);
+	if (ret)
+		return ret;
+
+	ret = generic_phy_set_mode(&phy, PHY_MODE_SATA, 0);
+	if (ret)
+		goto err;
+
+	ret = generic_phy_power_on(&phy);
+	if (ret)
+		goto err;
+
+	return 0;
+
+err:
+	generic_phy_exit(&phy);
+	return ret;
+}
+
 static int mvebu_ahci_probe(struct udevice *dev)
 {
+	int ret;
+
 	/*
 	 * Board specific SATA / AHCI enable code, e.g. enable the
 	 * AHCI power or deassert reset
 	 */
 	board_ahci_enable();
+
+	ret = mvebu_ahci_phy_power_on(dev);
+	if (ret)
+		return ret;
 
 	ahci_probe_scsi(dev, (ulong)devfdt_get_addr_ptr(dev));
 
