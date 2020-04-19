@@ -30,6 +30,7 @@
 #include <asm/io.h>
 #include <asm-generic/gpio.h>
 #include <dm/device_compat.h>
+#include <generic-phy.h>
 #include <linux/ioport.h>
 
 /* PCIe core registers */
@@ -92,6 +93,8 @@
 #define     PCIE_CORE_CTRL2_TD_ENABLE		BIT(4)
 #define     PCIE_CORE_CTRL2_STRICT_ORDER_ENABLE	BIT(5)
 #define     PCIE_CORE_CTRL2_ADDRWIN_MAP_ENABLE	BIT(6)
+#define PCIE_CORE_REF_CLK_REG			(CONTROL_BASE_ADDR + 0x14)
+#define     PCIE_CORE_REF_CLK_TX_ENABLE		BIT(1)
 
 /* LMI registers base address and register offsets */
 #define LMI_BASE_ADDR				0x6000
@@ -141,11 +144,13 @@
  *               number which may vary depending on the PCIe setup
  *               (PEX switches etc).
  * @device:      The pointer to PCI uclass device.
+ * @phy:         The PCIe generic-phy instance.
  */
 struct pcie_advk {
 	void           *base;
 	int            first_busno;
 	struct udevice *dev;
+	struct phy     phy;
 };
 
 static inline void advk_writel(struct pcie_advk *pcie, uint val, uint reg)
@@ -512,6 +517,11 @@ static int pcie_advk_setup_hw(struct pcie_advk *pcie)
 {
 	u32 reg;
 
+	/* Enable TX */
+	reg = advk_readl(pcie, PCIE_CORE_REF_CLK_REG);
+	reg |= PCIE_CORE_REF_CLK_TX_ENABLE;
+	advk_writel(pcie, reg, PCIE_CORE_REF_CLK_REG);
+
 	/* Set to Direct mode */
 	reg = advk_readl(pcie, CTRL_CONFIG_REG);
 	reg &= ~(CTRL_MODE_MASK << CTRL_MODE_SHIFT);
@@ -598,6 +608,47 @@ static int pcie_advk_setup_hw(struct pcie_advk *pcie)
 }
 
 /**
+ * pcie_advk_phy_power_on() - Initialize generic-phy for this controller
+ */
+static int pcie_advk_phy_power_on(struct pcie_advk *pcie)
+{
+	struct udevice *dev = pcie->dev;
+	struct phy *phy = &pcie->phy;
+	int ret;
+
+	ret = generic_phy_get_by_index(dev, 0, phy);
+	if (ret && ret != -ENOENT) {
+		dev_err(dev, "failed to get PCIe generic-phy\n");
+		return ret;
+	}
+
+	ret = generic_phy_init(phy);
+	if (ret) {
+		dev_err(dev, "failed to init PCIe generic-phy\n");
+		return ret;
+	}
+
+	ret = generic_phy_set_mode(phy, PHY_MODE_PCIE, 0);
+	if (ret) {
+		dev_err(dev, "failed to set mode on PCIe generic-phy\n");
+		goto err;
+	}
+
+	ret = generic_phy_power_on(phy);
+	if (ret) {
+		dev_err(dev, "failed to power on PCIe generic-phy\n");
+		goto err;
+	}
+
+	return 0;
+
+err:
+	generic_phy_exit(phy);
+
+	return ret;
+}
+
+/**
  * pcie_advk_probe() - Probe the PCIe bus for active link
  *
  * @dev: A pointer to the device being operated on
@@ -610,6 +661,9 @@ static int pcie_advk_setup_hw(struct pcie_advk *pcie)
 static int pcie_advk_probe(struct udevice *dev)
 {
 	struct pcie_advk *pcie = dev_get_priv(dev);
+
+	pcie->dev = pci_get_controller(dev);
+	pcie_advk_phy_power_on(pcie);
 
 #if CONFIG_IS_ENABLED(DM_GPIO)
 	struct gpio_desc reset_gpio;
@@ -640,7 +694,6 @@ static int pcie_advk_probe(struct udevice *dev)
 #endif /* DM_GPIO */
 
 	pcie->first_busno = dev->seq;
-	pcie->dev = pci_get_controller(dev);
 
 	return pcie_advk_setup_hw(pcie);
 }
