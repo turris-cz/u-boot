@@ -9,11 +9,13 @@
 #include <net.h>
 #include <asm/io.h>
 #include <asm/gpio.h>
+#include <button.h>
 #include <clk.h>
 #include <dm.h>
 #include <env.h>
 #include <fdt_support.h>
 #include <init.h>
+#include <led.h>
 #include <linux/delay.h>
 #include <linux/libfdt.h>
 #include <linux/string.h>
@@ -372,6 +374,45 @@ int misc_init_r(void)
 	return 0;
 }
 
+#define MOX_FACTORY_RESET_BOOTCMD					\
+	"setenv bootargs \"console=ttyMV0,115200 "			\
+			  "earlycon=ar3700_uart,0xd0012000\" && "	\
+	"sf probe && "							\
+	"sf read ${kernel_addr_r} 0x190000 && "				\
+	"lzmadec ${kernel_addr_r} ${ramdisk_addr_r} && "		\
+	"bootm ${ramdisk_addr_r}"
+
+static void handle_reset_button(void)
+{
+	struct udevice *button, *led;
+	int i;
+
+	if (device_get_global_by_ofnode(ofnode_path("/gpio-keys/reset"),
+					&button)) {
+		printf("Cannot find reset button!\n");
+		return;
+	}
+
+	if (device_get_global_by_ofnode(ofnode_path("/leds/led"), &led)) {
+		printf("Cannot find status LED!\n");
+		return;
+	}
+
+	led_set_state(led, LEDST_ON);
+
+	for (i = 0; i < 21; ++i) {
+		if (button_get_state(button) != BUTTON_ON)
+			return;
+		if (i < 20)
+			mdelay(50);
+	}
+
+	led_set_state(led, LEDST_OFF);
+
+	printf("RESET button was pressed, overwriting bootcmd!\n\n");
+	env_set("bootcmd", MOX_FACTORY_RESET_BOOTCMD);
+}
+
 static void mox_print_info(void)
 {
 	int ret, board_version, ram_size;
@@ -541,6 +582,8 @@ int last_stage_init(void)
 	}
 
 	printf("\n");
+
+	handle_reset_button();
 
 	return 0;
 }
