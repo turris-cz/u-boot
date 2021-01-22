@@ -76,6 +76,7 @@
 #include <config_distro_bootcmd.h>
 
 #define CONFIG_EXTRA_ENV_SETTINGS	\
+	"fdt_addr=0x4c80000\0"		\
 	"scriptaddr=0x4d00000\0"	\
 	"pxefile_addr_r=0x4e00000\0"	\
 	"fdt_addr_r=0x4f00000\0"	\

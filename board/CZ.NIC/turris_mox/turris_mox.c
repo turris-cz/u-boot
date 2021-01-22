@@ -22,6 +22,7 @@
 #include <miiphy.h>
 #include <mvebu/comphy.h>
 #include <spi.h>
+#include <spi_flash.h>
 
 #include "mox_sp.h"
 
@@ -42,6 +43,7 @@
 
 #define ETH1_PATH	"/soc/internal-regs@d0000000/ethernet@40000"
 #define MDIO_PATH	"/soc/internal-regs@d0000000/mdio@32004"
+#define SPI_FLASH_PATH	"/soc/internal-regs@d0000000/spi@10600/spi-flash@0"
 #define SFP_GPIO_PATH	"/soc/internal-regs@d0000000/spi@10600/moxtet@1/gpio@0"
 #define PCIE_PATH	"/soc/pcie@d0070000"
 #define SFP_PATH	"/sfp"
@@ -447,6 +449,66 @@ static void handle_reset_button(void)
 	env_set("bootcmd", MOX_FACTORY_RESET_BOOTCMD);
 }
 
+static ofnode
+ofnode_find_available_child_by_string_property(ofnode node, const char *propname,
+					       const char *value)
+{
+	ofnode child;
+
+	ofnode_for_each_subnode(child, node) {
+		const char *propvalue;
+
+		if (!ofnode_is_available(child))
+			continue;
+
+		propvalue = ofnode_read_string(child, propname);
+		if (!propvalue)
+			continue;
+
+		if (!strcmp(propvalue, value))
+			return child;
+	}
+
+	return ofnode_null();
+}
+
+static void mox_read_dtb(void)
+{
+	struct udevice *dev;
+	ofnode parts, part;
+	u32 offset, size;
+	ulong fdt_addr;
+
+	if (device_get_global_by_ofnode(ofnode_path(SPI_FLASH_PATH), &dev)) {
+		printf("Cannot find SPI NOR!\n");
+		return;
+	}
+
+	parts = dev_read_subnode(dev, "partitions");
+	if (!ofnode_valid(parts) || !ofnode_is_available(parts))
+		goto err;
+
+	part = ofnode_find_available_child_by_string_property(parts, "label",
+							      "dtb");
+	if (!ofnode_valid(part))
+		goto err;
+
+	if (ofnode_read_u32_index(part, "reg", 0, &offset))
+		goto err;
+
+	if (ofnode_read_u32_index(part, "reg", 1, &size))
+		goto err;
+
+	fdt_addr = env_get_hex("fdt_addr", 0x4c80000);
+
+	if (spi_flash_read_dm(dev, offset, size, (void *)fdt_addr))
+		goto err;
+
+	return;
+err:
+	printf("Cannot read device tree from SPI NOR!\n");
+}
+
 static void mox_print_info(void)
 {
 	int ret, board_version, ram_size;
@@ -618,6 +680,7 @@ int last_stage_init(void)
 	printf("\n");
 
 	handle_reset_button();
+	mox_read_dtb();
 
 	return 0;
 }
