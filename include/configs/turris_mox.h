@@ -81,6 +81,7 @@
 	"fdt_addr_r=0x4f00000\0"	\
 	"kernel_addr_r=0x5000000\0"	\
 	"ramdisk_addr_r=0x8000000\0"	\
+	"fdtfile=marvell/" CONFIG_DEFAULT_DEVICE_TREE ".dtb\0"	\
 	BOOTENV
 
 #endif /* _CONFIG_TURRIS_MOX_H */
