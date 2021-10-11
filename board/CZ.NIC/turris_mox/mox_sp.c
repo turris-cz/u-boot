@@ -9,6 +9,8 @@
 #include <linux/bitops.h>
 #include <linux/delay.h>
 
+#include "mox_sp.h"
+
 #define RWTM_BASE		(MVEBU_REGISTER(0xb0000))
 #define RWTM_CMD_PARAM(i)	(size_t)(RWTM_BASE + (i) * 4)
 #define RWTM_CMD		(RWTM_BASE + 0x40)
@@ -109,12 +111,13 @@ static inline void res_to_mac(u8 *mac, u32 t1, u32 t2)
 	mac[5] = t2;
 }
 
-int mbox_sp_get_board_info(u64 *sn, u8 *mac1, u8 *mac2, int *bv, int *ram)
+int mbox_sp_get_board_info(u64 *sn, u8 *mac1, u8 *mac2, int *bv, int *ram,
+			   enum cznic_a3720_board *board)
 {
-	u32 out[8];
+	u32 out[9];
 	int res;
 
-	res = mbox_do_cmd(MBOX_CMD_BOARD_INFO, out, 8);
+	res = mbox_do_cmd(MBOX_CMD_BOARD_INFO, out, 9);
 	if (res < 0)
 		return res;
 
@@ -135,6 +138,9 @@ int mbox_sp_get_board_info(u64 *sn, u8 *mac1, u8 *mac2, int *bv, int *ram)
 
 	if (mac2)
 		res_to_mac(mac2, out[6], out[7]);
+
+	if (board)
+		*board = out[8] + 1;
 
 	return 0;
 }
