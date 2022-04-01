@@ -352,9 +352,9 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 #if defined(CONFIG_TARGET_P1020RDB_PD) || defined(CONFIG_TARGET_P1020RDB_PC)
 	const char *soc_usb_compat = "fsl-usb2-dr";
 	int usb_err, usb1_off, usb2_off;
-#endif
 #if defined(CONFIG_SDCARD) || defined(CONFIG_SPIFLASH)
 	int err;
+#endif
 #endif
 
 	ft_cpu_setup(blob, bd);
@@ -373,6 +373,7 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 	fsl_fdt_fixup_dr_usb(blob, bd);
 #endif
 
+#if defined(CONFIG_TARGET_P1020RDB_PD) || defined(CONFIG_TARGET_P1020RDB_PC)
 #if defined(CONFIG_SDCARD) || defined(CONFIG_SPIFLASH)
 	/* Delete eLBC node as it is muxed with USB2 controller */
 	if (hwconfig("usb2")) {
@@ -394,7 +395,6 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 	}
 #endif
 
-#if defined(CONFIG_TARGET_P1020RDB_PD) || defined(CONFIG_TARGET_P1020RDB_PC)
 /* Delete USB2 node as it is muxed with eLBC */
 	usb1_off = fdt_node_offset_by_compatible(blob, -1,
 		soc_usb_compat);
