@@ -30,6 +30,18 @@
 #define RST_NOR_CMD(var, ...) ""
 #endif
 
+#ifdef __SW_BOOT_NOR_BANK_LO
+#define RST_NOR_LO_CMD(var, ...) __VAR_CMD_RST(var, __VA_ARGS__ __BOOTSRC_CMD(__SW_BOOT_NOR_BANK_LO, __SW_BOOT_MASK))
+#else
+#define RST_NOR_LO_CMD(var, ...) ""
+#endif
+
+#ifdef __SW_BOOT_NOR_BANK_UP
+#define RST_NOR_UP_CMD(var, ...) __VAR_CMD_RST(var, __VA_ARGS__ __BOOTSRC_CMD(__SW_BOOT_NOR_BANK_UP, __SW_BOOT_MASK))
+#else
+#define RST_NOR_UP_CMD(var, ...) ""
+#endif
+
 #ifdef __SW_BOOT_SPI
 #define RST_SPI_CMD(var, ...) __VAR_CMD_RST(var, __VA_ARGS__ __BOOTSRC_CMD(__SW_BOOT_SPI, __SW_BOOT_MASK))
 #else
@@ -40,6 +52,12 @@
 #define RST_SD_CMD(var, ...) __VAR_CMD_RST(var, __VA_ARGS__ __BOOTSRC_CMD(__SW_BOOT_SD, __SW_BOOT_MASK))
 #else
 #define RST_SD_CMD(var, ...) ""
+#endif
+
+#ifdef __SW_BOOT_SD2
+#define RST_SD2_CMD(var, ...) __VAR_CMD_RST(var, __VA_ARGS__ __BOOTSRC_CMD(__SW_BOOT_SD2, __SW_BOOT_MASK))
+#else
+#define RST_SD2_CMD(var, ...) ""
 #endif
 
 #ifdef __SW_BOOT_NAND
@@ -53,3 +71,5 @@
 #else
 #define RST_PCIE_CMD(var, ...) ""
 #endif
+
+#define RST_DEF_CMD(var, ...) __VAR_CMD_RST(var, __VA_ARGS__ __BOOTSRC_CMD(0x00, 0xff))
