@@ -1127,7 +1127,7 @@ switch_as:
 	/*--------------------------------------------------------------*/
 	lis	r3,CONFIG_SYS_MONITOR_BASE@h
 	ori	r3,r3,CONFIG_SYS_MONITOR_BASE@l
-	addi	r3,r3,_start_cont - _start_cont
+	addi	r3,r3,_start_cont - CONFIG_SYS_MONITOR_BASE
 	mtlr	r3
 	blr
 #endif
@@ -1599,7 +1599,7 @@ relocate_code:
  * initialization, now running from RAM.
  */
 
-	addi	r0,r10,in_ram - _start_cont
+	addi	r0,r10,in_ram - CONFIG_SYS_MONITOR_BASE
 
 	/*
 	 * As IVPR is going to point RAM address,
