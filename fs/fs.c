@@ -286,7 +286,7 @@ static struct fstype_info fstypes[] = {
 		.ln = fs_ln_unsupported,
 	},
 #endif
-#if IS_ENABLED(CONFIG_FS_SQUASHFS)
+#if CONFIG_IS_ENABLED(FS_SQUASHFS)
 	{
 		.fstype = FS_TYPE_SQUASHFS,
 		.name = "squashfs",
