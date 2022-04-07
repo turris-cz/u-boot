@@ -267,6 +267,7 @@ static struct fstype_info fstypes[] = {
 	},
 #endif
 #endif
+#ifndef CONFIG_SPL_BUILD
 #ifdef CONFIG_FS_BTRFS
 	{
 		.fstype = FS_TYPE_BTRFS,
@@ -285,6 +286,7 @@ static struct fstype_info fstypes[] = {
 		.mkdir = fs_mkdir_unsupported,
 		.ln = fs_ln_unsupported,
 	},
+#endif
 #endif
 #if CONFIG_IS_ENABLED(FS_SQUASHFS)
 	{
