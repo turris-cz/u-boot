@@ -63,9 +63,10 @@ struct fsl_e_tlb_entry tlb_table[] = {
 #endif
 #endif /* not SPL */
 
+	/* *I*G - CPLD 256K (effective only 128K; e500 does not support BOOKE_PAGESZ_128K) */
 	SET_TLB_ENTRY(1, CONFIG_SYS_CPLD_BASE, CONFIG_SYS_CPLD_BASE_PHYS,
 			MAS3_SX|MAS3_SW|MAS3_SR, MAS2_I|MAS2_G,
-			0, 6, BOOKE_PAGESZ_1M, 1),
+			0, 6, BOOKE_PAGESZ_256K, 1),
 
 #ifdef CONFIG_SYS_NAND_BASE
 	/* *I*G - NAND */
