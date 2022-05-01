@@ -122,7 +122,9 @@
 #define CONFIG_SYS_FLASH_BR_PRELIM \
 		(BR_PHYS_ADDR(CONFIG_SYS_FLASH_BASE_PHYS + 0x8000000) \
 		 | BR_PS_16 | BR_V)
-#define CONFIG_SYS_FLASH_OR_PRELIM ((0xf8000ff7 & ~OR_GPCM_SCY & ~OR_GPCM_EHTR) \
+#define CONFIG_SYS_FLASH_OR_PRELIM (OR_AM_128MB | OR_GPCM_CSNT | \
+					| OR_GPCM_ACS_DIV2 | OR_GPCM_XACS \
+					| OR_GPCM_TRLX | OR_GPCM_EAD \
 					| OR_GPCM_SCY_8 | OR_GPCM_EHTR_CLEAR)
 
 #define CONFIG_SYS_BR1_PRELIM \
@@ -171,11 +173,11 @@
 
 /* NAND flash config */
 #define CONFIG_SYS_NAND_BR_PRELIM  (BR_PHYS_ADDR(CONFIG_SYS_NAND_BASE_PHYS) \
-			       | (2<<BR_DECC_SHIFT)    /* Use HW ECC */ \
+			       | BR_DECC_CHK_GEN       /* Use HW ECC */ \
 			       | BR_PS_8	       /* Port Size = 8 bit */ \
 			       | BR_MS_FCM	       /* MSEL = FCM */ \
 			       | BR_V)		       /* valid */
-#define CONFIG_SYS_NAND_OR_PRELIM  (0xFFFC0000	      /* length 256K */ \
+#define CONFIG_SYS_NAND_OR_PRELIM  (OR_AM_256KB	       /* length 256K */ \
 			       | OR_FCM_PGS	       /* Large Page*/ \
 			       | OR_FCM_CSCT \
 			       | OR_FCM_CST \
