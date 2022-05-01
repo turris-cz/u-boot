@@ -246,7 +246,7 @@
  * 0xec00_0000 0xefff_ffff	NOR flash	Up to 64M non-cacheable	CS0/1
  * 0xf8f8_0000 0xf8ff_ffff	L2 SRAM		Up to 512K cacheable
  *   (early boot only)
- * 0xff80_0000 0xff80_7fff	NAND flash	32K non-cacheable	CS1/0
+ * 0xff80_0000 0xff83_ffff	NAND flash	32K/256K non-cacheable	CS1/0
  * 0xffa0_0000 0xffa1_ffff	CPLD		128K non-cacheable	CS3
  * 0xffb0_0000 0xffbf_ffff	VSC7385 switch  1M non-cacheable	CS2
  * 0xffc0_0000 0xffc3_ffff	PCI IO range	256k non-cacheable
@@ -314,7 +314,7 @@
 	| BR_MS_FCM	/* MSEL = FCM */ \
 	| BR_V)	/* valid */
 #if defined(CONFIG_TARGET_P1020RDB_PD)
-#define CONFIG_SYS_NAND_OR_PRELIM	(OR_AM_32KB \
+#define CONFIG_SYS_NAND_OR_PRELIM	(OR_AM_256KB \
 	| OR_FCM_PGS	/* Large Page*/ \
 	| OR_FCM_CSCT \
 	| OR_FCM_CST \

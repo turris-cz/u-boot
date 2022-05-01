@@ -75,10 +75,17 @@ struct fsl_e_tlb_entry tlb_table[] = {
 			0, 6, BOOKE_PAGESZ_256K, 1),
 
 #ifdef CONFIG_SYS_NAND_BASE
-	/* *I*G - NAND */
+#ifdef CONFIG_TARGET_P1020RDB_PD
+	/* *I*G - NAND large page 256K */
 	SET_TLB_ENTRY(1, CONFIG_SYS_NAND_BASE, CONFIG_SYS_NAND_BASE_PHYS,
 			MAS3_SX|MAS3_SW|MAS3_SR, MAS2_I|MAS2_G,
-			0, 7, BOOKE_PAGESZ_1M, 1),
+			0, 7, BOOKE_PAGESZ_256K, 1),
+#else
+	/* *I*G - NAND small page 64K (effective only 32K; e500 does not support BOOKE_PAGESZ_32K) */
+	SET_TLB_ENTRY(1, CONFIG_SYS_NAND_BASE, CONFIG_SYS_NAND_BASE_PHYS,
+			MAS3_SX|MAS3_SW|MAS3_SR, MAS2_I|MAS2_G,
+			0, 7, BOOKE_PAGESZ_64K, 1),
+#endif
 #endif
 
 #if defined(CONFIG_SYS_RAMBOOT) || \
