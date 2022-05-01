@@ -311,6 +311,8 @@ int checkboard(void)
 int board_early_init_r(void)
 {
 	const unsigned int flashbase = CONFIG_SYS_FLASH_BASE;
+	const u8 flashsize = IS_ENABLED(CONFIG_TARGET_P1020RDB_PD) ?
+			     BOOKE_PAGESZ_64M : BOOKE_PAGESZ_16M;
 	int flash_esel = find_tlb_idx((void *)flashbase, 1);
 #ifdef CONFIG_VSC7385_ENET
 	unsigned int vscfw_addr;
@@ -337,7 +339,7 @@ int board_early_init_r(void)
 
 	set_tlb(1, flashbase, CONFIG_SYS_FLASH_BASE_PHYS, /* tlb, epn, rpn */
 		MAS3_SX|MAS3_SW|MAS3_SR, MAS2_I|MAS2_G,/* perms, wimge */
-		0, flash_esel, BOOKE_PAGESZ_64M, 1);/* ts, esel, tsize, iprot */
+		0, flash_esel, flashsize, 1);/* ts, esel, tsize, iprot */
 
 #ifdef CONFIG_VSC7385_ENET
 	/* If a VSC7385 microcode image is present, then upload it. */

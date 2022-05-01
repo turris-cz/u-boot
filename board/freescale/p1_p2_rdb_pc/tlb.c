@@ -39,9 +39,15 @@ struct fsl_e_tlb_entry tlb_table[] = {
 #ifndef CONFIG_SPL_BUILD
 	/* W**G* - Flash/promjet, localbus */
 	/* This will be changed to *I*G* after relocation to RAM. */
+#ifdef CONFIG_TARGET_P1020RDB_PD
 	SET_TLB_ENTRY(1, CONFIG_SYS_FLASH_BASE, CONFIG_SYS_FLASH_BASE_PHYS,
 			MAS3_SX|MAS3_SR, MAS2_W|MAS2_G,
 			0, 2, BOOKE_PAGESZ_64M, 1),
+#else
+	SET_TLB_ENTRY(1, CONFIG_SYS_FLASH_BASE, CONFIG_SYS_FLASH_BASE_PHYS,
+			MAS3_SX|MAS3_SR, MAS2_W|MAS2_G,
+			0, 2, BOOKE_PAGESZ_16M, 1),
+#endif
 
 #ifdef CONFIG_PCI
 	/* *I*G* - PCI memory 1.5G */
