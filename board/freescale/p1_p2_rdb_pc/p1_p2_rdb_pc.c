@@ -223,7 +223,11 @@ int checkboard(void)
 	u8 in, out, invert, io_config, val;
 	int bus_num = CONFIG_SYS_SPD_BUS_NUM;
 
-	printf("Board: %s CPLD: V%d.%d PCBA: V%d.0\n", CONFIG_BOARDNAME,
+#ifdef CONFIG_BOARDNAME
+	printf("Board: %s ", CONFIG_BOARDNAME);
+#endif
+
+	printf("CPLD: V%d.%d PCBA: V%d.0\n",
 		in_8(&cpld_data->cpld_rev_major) & 0x0F,
 		in_8(&cpld_data->cpld_rev_minor) & 0x0F,
 		in_8(&cpld_data->pcba_rev) & 0x0F);
