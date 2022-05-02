@@ -1,0 +1,13 @@
+// SPDX-License-Identifier: GPL-2.0+
+
+&soc {
+	i2c@3000 {
+		u-boot,dm-pre-reloc;
+
+		crypto@64 {
+			u-boot,dm-pre-reloc;
+		};
+	};
+};
+
+#include "u-boot.dtsi"
