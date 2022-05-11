@@ -62,6 +62,13 @@ SECTIONS
 	__init_begin = .;
 	__init_end = .;
 	_end = .;
+
+#ifdef CONFIG_SYS_MPC85XX_NO_RESETVEC
+#if defined(CONFIG_SDCARD) && !defined(CONFIG_SYS_MMC_U_BOOT_OFFS)
+	mmc_u_boot_offs = .;
+#endif
+#endif
+
 #ifdef CONFIG_SPL_SKIP_RELOCATE
 	. = ALIGN(4);
 	__bss_start = .;
@@ -94,6 +101,9 @@ SECTIONS
 	.resetvec IMAGE_TEXT_BASE + RESET_VECTOR_OFFSET : {
 		KEEP(*(.resetvec))
 	} = 0xffff
+#if defined(CONFIG_SDCARD) && !defined(CONFIG_SYS_MMC_U_BOOT_OFFS)
+	mmc_u_boot_offs = .;
+#endif
 #endif
 
 #ifndef CONFIG_SPL_SKIP_RELOCATE
