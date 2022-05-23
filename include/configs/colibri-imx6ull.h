@@ -101,7 +101,6 @@
 	NFS_BOOTCMD \
 	UBI_BOOTCMD \
 	UBOOT_UPDATE \
-	"bootubipart=ubi\0" \
 	"console=ttymxc0\0" \
 	"defargs=user_debug=30\0" \
 	"fdt_board=eval-v3\0" \
