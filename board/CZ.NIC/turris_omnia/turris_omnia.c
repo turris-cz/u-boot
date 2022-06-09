@@ -22,6 +22,7 @@
 #include <fdt_support.h>
 #include <time.h>
 #include <linux/bitops.h>
+#include <linux/delay.h>
 #include <u-boot/crc.h>
 
 #include "../drivers/ddr/marvell/a38x/ddr3_init.h"
@@ -62,11 +63,24 @@ enum mcu_commands {
 	CMD_GET_STATUS_WORD	= 0x01,
 	CMD_GET_RESET		= 0x09,
 	CMD_WATCHDOG_STATE	= 0x0b,
+	CMD_EXT_CONTROL		= 0x12,
 };
 
 enum status_word_bits {
 	CARD_DET_STSBIT		= 0x0010,
 	MSATA_IND_STSBIT	= 0x0020,
+};
+
+enum ext_control_bits {
+	RES_MMC			= 0,
+	RES_LAN			= 1,
+	RES_PHY			= 2,
+	PERST0			= 3,
+	PERST1			= 4,
+	PERST2			= 5,
+	PHY_SFP			= 6,
+	PHY_SFP_AUTO		= 7,
+	VHV_CTRL		= 8,
 };
 
 /*
@@ -667,6 +681,10 @@ int board_init(void)
 
 int board_late_init(void)
 {
+	u32 val, val4, val8, val10, val14;
+	u16 ctrl[2];
+	int ret;
+
 	/*
 	 * If not booting from UART, MCU watchdog was not disabled in SPL,
 	 * disable it now.
@@ -676,6 +694,110 @@ int board_late_init(void)
 
 	set_regdomain();
 	handle_reset_button();
+
+	/* release PERST#s */
+	printf("Releasing PERST#... ");
+	ctrl[0] = 0;
+	ctrl[1] = cpu_to_le16(BIT(PERST0) | BIT(PERST1) | BIT(PERST2));
+	ret = omnia_mcu_write(CMD_EXT_CONTROL, ctrl, 4);
+	if (ret)
+		printf("failed: %i\n", ret);
+	else
+		printf("done\n");
+
+	/* release PHY reset */
+	printf("Releasing PHY reset... ");
+	ctrl[0] = 0;
+	ctrl[1] = cpu_to_le16(BIT(RES_PHY));
+	ret = omnia_mcu_write(CMD_EXT_CONTROL, ctrl, 4);
+	if (ret)
+		printf("failed: %i\n", ret);
+	else
+		printf("done\n");
+
+	/* release PHY reset */
+	printf("Releasing MMC reset... ");
+	ctrl[0] = 0;
+	ctrl[1] = cpu_to_le16(BIT(RES_MMC));
+	ret = omnia_mcu_write(CMD_EXT_CONTROL, ctrl, 4);
+	if (ret)
+		printf("failed: %i\n", ret);
+	else
+		printf("done\n");
+
+	printf("Changing RGMII pins to GPIO mode...\n");
+
+	val = val4 = readl(MVEBU_MPP_BASE + 0x04);
+	val &= ~GENMASK(19, 16); /* MPP[12] := GPIO */
+	val &= ~GENMASK(23, 20); /* MPP[13] := GPIO */
+	val &= ~GENMASK(27, 24); /* MPP[14] := GPIO */
+	val &= ~GENMASK(31, 28); /* MPP[15] := GPIO */
+	writel(val, MVEBU_MPP_BASE + 0x04);
+
+	val = val8 = readl(MVEBU_MPP_BASE + 0x08);
+	val &= ~GENMASK(3, 0);   /* MPP[16] := GPIO */
+	val &= ~GENMASK(23, 20); /* MPP[21] := GPIO */
+	writel(val, MVEBU_MPP_BASE + 0x08);
+
+	val = val10 = readl(MVEBU_MPP_BASE + 0x10);
+	val &= ~GENMASK(27, 24); /* MPP[38] := GPIO */
+	val &= ~GENMASK(31, 28); /* MPP[39] := GPIO */
+	writel(val, MVEBU_MPP_BASE + 0x10);
+
+	val = val14 = readl(MVEBU_MPP_BASE + 0x14);
+	val &= ~GENMASK(3, 0);   /* MPP[40] := GPIO */
+	val &= ~GENMASK(7, 4);   /* MPP[41] := GPIO */
+	writel(val, MVEBU_MPP_BASE + 0x14);
+
+	printf("Setting initial value for switch reset strapping pins...\n");
+
+	val = readl(MVEBU_GPIO0_BASE + 0x00);
+	val |= BIT(12);		/* GPIO[12] := 1 */
+	val |= BIT(13);		/* GPIO[13] := 1 */
+	val |= BIT(14);		/* GPIO[14] := 1 */
+	val |= BIT(15);		/* GPIO[15] := 1 */
+	val &= ~BIT(16);	/* GPIO[16] := 0 */
+	val |= BIT(21);		/* GPIO[21] := 1 */
+	writel(val, MVEBU_GPIO0_BASE + 0x00);
+
+	val = readl(MVEBU_GPIO1_BASE + 0x00);
+	val |= BIT(6);		/* GPIO[38] := 1 */
+	val |= BIT(7);		/* GPIO[39] := 1 */
+	val |= BIT(8);		/* GPIO[40] := 1 */
+	val &= ~BIT(9);		/* GPIO[41] := 0 */
+	writel(val, MVEBU_GPIO1_BASE + 0x00);
+
+	val = readl(MVEBU_GPIO0_BASE + 0x04);
+	val &= ~BIT(12);	/* GPIO[12] := Out Enable */
+	val &= ~BIT(13);	/* GPIO[13] := Out Enable */
+	val &= ~BIT(14);	/* GPIO[14] := Out Enable */
+	val &= ~BIT(15);	/* GPIO[15] := Out Enable */
+	val &= ~BIT(16);	/* GPIO[16] := Out Enable */
+	val &= ~BIT(21);	/* GPIO[21] := Out Enable */
+	writel(val, MVEBU_GPIO0_BASE + 0x04);
+
+	val = readl(MVEBU_GPIO1_BASE + 0x04);
+	val &= ~BIT(6);		/* GPIO[38] := Out Enable */
+	val &= ~BIT(7);		/* GPIO[39] := Out Enable */
+	val &= ~BIT(8);		/* GPIO[40] := Out Enable */
+	val &= ~BIT(9);		/* GPIO[41] := Out Enable */
+	writel(val, MVEBU_GPIO1_BASE + 0x04);
+
+	printf("Releasing switch reset... ");
+	ctrl[0] = 0;
+	ctrl[1] = cpu_to_le16(BIT(RES_LAN));
+	ret = omnia_mcu_write(CMD_EXT_CONTROL, ctrl, 4);
+	if (ret)
+		printf("failed: %i\n", ret);
+	else
+		printf("done\n");
+
+	printf("Changing RGMII pins back to RGMII mode...\n");
+	writel(val4, MVEBU_MPP_BASE + 0x04);
+	writel(val8, MVEBU_MPP_BASE + 0x08);
+	writel(val10, MVEBU_MPP_BASE + 0x10);
+	writel(val14, MVEBU_MPP_BASE + 0x14);
+
 	pci_init();
 
 	return 0;
