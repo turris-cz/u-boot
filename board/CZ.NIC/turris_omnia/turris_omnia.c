@@ -695,6 +695,13 @@ int board_late_init(void)
 	set_regdomain();
 	handle_reset_button();
 
+	clrbits_32(MVEBU_MPP_BASE + 0x14, GENMASK(15, 12));/////////////////////omnia nxp
+	setbits_32(MVEBU_GPIO1_BASE + 0x00, BIT(11));/////////////////////omnia nxp
+	setbits_32(MVEBU_GPIO1_BASE + 0x04, BIT(11));/////////////////////omnia nxp
+	mdelay(10);
+	clrbits_32(MVEBU_GPIO1_BASE + 0x00, BIT(11));/////////////////////omnia nxp
+	mdelay(10);
+
 	/* release PERST#s */
 	printf("Releasing PERST#... ");
 	ctrl[0] = 0;
@@ -791,6 +798,9 @@ int board_late_init(void)
 		printf("failed: %i\n", ret);
 	else
 		printf("done\n");
+
+	setbits_32(MVEBU_GPIO1_BASE + 0x00, BIT(11));/////////////////////omnia nxp
+	mdelay(10);
 
 	printf("Changing RGMII pins back to RGMII mode...\n");
 	writel(val4, MVEBU_MPP_BASE + 0x04);
