@@ -372,7 +372,7 @@ int fsl_dcu_init(struct fb_info *fbinfo, unsigned int xres,
 	return 0;
 }
 
-ulong board_get_usable_ram_top(ulong total_size)
+phys_size_t board_get_usable_ram_top(phys_size_t total_size)
 {
 	return gd->ram_top - CONFIG_VIDEO_FSL_DCU_MAX_FB_SIZE_MB;
 }

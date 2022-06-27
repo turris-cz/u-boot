@@ -309,7 +309,7 @@ phys_size_t get_effective_memsize(void)
 #endif
 }
 
-ulong board_get_usable_ram_top(ulong total_size)
+phys_size_t board_get_usable_ram_top(phys_size_t total_size)
 {
 	ulong top_addr = PHYS_SDRAM + gd->ram_size;
 
