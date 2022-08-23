@@ -407,6 +407,8 @@ int board_eth_init(struct bd_info *bis)
 }
 #endif
 
+__weak void fix_fdt_model(void *blob) {}
+
 #if defined(CONFIG_OF_BOARD_SETUP) || defined(CONFIG_OF_BOARD_FIXUP)
 static void fix_max6370_watchdog(void *blob)
 {
@@ -450,6 +452,7 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 			sizeof("okay"), 0);
 #endif
 
+	fix_fdt_model(blob);
 	fix_max6370_watchdog(blob);
 
 #if defined(CONFIG_HAS_FSL_DR_USB)
@@ -507,6 +510,7 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 #ifdef CONFIG_OF_BOARD_FIXUP
 int board_fix_fdt(void *blob)
 {
+	fix_fdt_model(blob);
 	fix_max6370_watchdog(blob);
 	return 0;
 }
