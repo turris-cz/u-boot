@@ -946,7 +946,7 @@ static const init_fnc_t init_sequence_f[] = {
 	 *  - board info struct
 	 */
 	setup_dest_addr,
-#ifdef CONFIG_OF_BOARD_FIXUP
+#if defined(CONFIG_OF_BOARD_FIXUP) && !defined(CONFIG_OF_INITIAL_DTB_READONLY)
 	fix_fdt,
 #endif
 #ifdef CFG_PRAM
@@ -962,6 +962,10 @@ static const init_fnc_t init_sequence_f[] = {
 	reserve_board,
 	reserve_global_data,
 	reserve_fdt,
+#if defined(CONFIG_OF_BOARD_FIXUP) && defined(CONFIG_OF_INITIAL_DTB_READONLY)
+	reloc_fdt,
+	fix_fdt,
+#endif
 	reserve_bootstage,
 	reserve_bloblist,
 	reserve_arch,
@@ -972,7 +976,9 @@ static const init_fnc_t init_sequence_f[] = {
 	setup_bdinfo,
 	display_new_sp,
 	INIT_FUNC_WATCHDOG_RESET
+#if !defined(CONFIG_OF_BOARD_FIXUP) || !defined(CONFIG_OF_INITIAL_DTB_READONLY)
 	reloc_fdt,
+#endif
 	reloc_bootstage,
 	reloc_bloblist,
 	setup_reloc,
