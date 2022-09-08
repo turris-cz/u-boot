@@ -407,6 +407,14 @@ int board_eth_init(struct bd_info *bis)
 }
 #endif
 
+__weak void ft_memory_setup(void *blob, struct bd_info *bd)
+{
+	phys_addr_t base = env_get_bootm_low();
+	phys_size_t size = env_get_bootm_size();
+
+	fdt_fixup_memory(blob, (u64)base, (u64)size);
+}
+
 __weak void fix_fdt_model(void *blob) {}
 
 #if defined(CONFIG_OF_BOARD_SETUP) || defined(CONFIG_OF_BOARD_FIXUP)
@@ -430,8 +438,6 @@ static void fix_max6370_watchdog(void *blob)
 #ifdef CONFIG_OF_BOARD_SETUP
 int ft_board_setup(void *blob, struct bd_info *bd)
 {
-	phys_addr_t base;
-	phys_size_t size;
 #if defined(CONFIG_TARGET_P1020RDB_PD) || defined(CONFIG_TARGET_P1020RDB_PC)
 	const char *soc_usb_compat = "fsl-usb2-dr";
 	int usb_err, usb1_off, usb2_off;
@@ -441,11 +447,7 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 #endif
 
 	ft_cpu_setup(blob, bd);
-
-	base = env_get_bootm_low();
-	size = env_get_bootm_size();
-
-	fdt_fixup_memory(blob, (u64)base, (u64)size);
+	ft_memory_setup(blob, bd);
 
 #ifdef CONFIG_QE
 	do_fixup_by_compat(blob, "fsl,qe", "status", "okay",
