@@ -55,12 +55,12 @@ static int detect_model_serial(const char **model, char serial[17])
 
 void fix_fdt_model(void *blob)
 {
-	const char *old_model;
 	const char *model;
 	char serial[17];
 	int len;
 	int off;
 	int rev;
+	char c;
 
 	rev = detect_model_serial(&model, serial);
 	if (rev < 0)
@@ -74,15 +74,15 @@ void fix_fdt_model(void *blob)
 	}
 
 	/* Fix model string only in case it is generic "Turris 1.x" */
-	old_model = fdt_getprop(blob, 0, "model", &len);
+	model = fdt_getprop(blob, 0, "model", &len);
 	if (len < sizeof("Turris 1.x")-1)
 		return;
-	if (memcmp(old_model, "Turris 1.x", sizeof("Turris 1.x")-1) != 0)
+	if (memcmp(model, "Turris 1.x", sizeof("Turris 1.x")-1) != 0)
 		return;
 
-	len = strlen(model) + 1;
-	fdt_increase_size(blob, len);
-	fdt_setprop(blob, 0, "model", model, len);
+	c = '0' + rev;
+	fdt_setprop_inplace_namelen_partial(blob, 0, "model", sizeof("model")-1,
+					    sizeof("Turris 1.")-1, &c, 1);
 }
 
 int misc_init_r(void)
