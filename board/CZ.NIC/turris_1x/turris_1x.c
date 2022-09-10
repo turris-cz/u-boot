@@ -26,6 +26,125 @@
 #define TURRIS_CPLD_LED_BRIGHTNESS_REG_LAST	((void *)CONFIG_SYS_CPLD_BASE + 0x1e)
 #define TURRIS_CPLD_LED_SW_OVERRIDE_REG		((void *)CONFIG_SYS_CPLD_BASE + 0x22)
 
+static inline int fdt_setprop_inplace_u32_partial(void *blob, int node,
+						  const char *name,
+						  u32 idx, u32 val)
+{
+	val = cpu_to_fdt32(val);
+
+	return fdt_setprop_inplace_namelen_partial(blob, node, name,
+						   strlen(name),
+						   idx * sizeof(u32),
+						   &val, sizeof(u32));
+}
+
+/* Decrease size of 3rd PCIe controller MEM in "ranges" DT to 2MB recursively */
+static void fdt_fixup_pcie3_mem_size(void *blob, int node)
+{
+	int pci_cells, cpu_cells, size_cells;
+	const u32 *ranges;
+	int pnode;
+	int i, len;
+	u32 pci_flags;
+	u64 cpu_addr;
+	u64 size;
+	int idx;
+	int subnode;
+	int ret;
+
+	if (!fdtdec_get_is_enabled(blob, node))
+		return;
+
+	ranges = fdt_getprop(blob, node, "ranges", &len);
+	if (!ranges || !len || len % sizeof(u32))
+		return;
+
+	/*
+	 * The "ranges" property is an array of
+	 *   { <PCI address> <CPU address> <size in PCI address space> }
+	 * where number of PCI address cells and size cells is stored in the
+	 * "#address-cells" and "#size-cells" properties of the same node
+	 * containing the "ranges" property and number of CPU address cells
+	 * is stored in the parent's "#address-cells" property.
+	 *
+	 * All 3 elements can span a different number of cells. Fetch them.
+	 */
+	pnode = fdt_parent_offset(blob, node);
+	pci_cells = fdt_address_cells(blob, node);
+	cpu_cells = fdt_address_cells(blob, pnode);
+	size_cells = fdt_size_cells(blob, node);
+
+	/* PCI addresses always use 3 cells */
+	if (pci_cells != 3)
+		return;
+
+	/* CPU addresses and sizes on P2020 may be 32-bit (1 cell) or 64-bit (2 cells) */
+	if (cpu_cells != 1 && cpu_cells != 2)
+		return;
+	if (size_cells != 1 && size_cells != 2)
+		return;
+
+	for (i = 0; i < len / sizeof(u32); i += pci_cells + cpu_cells + size_cells) {
+		/* PCI address consists of 3 cells: flags, addr.hi, addr.lo */
+		pci_flags = fdt32_to_cpu(ranges[i]);
+
+		cpu_addr = fdt32_to_cpu(ranges[i + pci_cells]);
+		if (cpu_cells == 2) {
+			cpu_addr <<= 32;
+			cpu_addr |= fdt32_to_cpu(ranges[i + pci_cells + 1]);
+		}
+
+		size = fdt32_to_cpu(ranges[i + pci_cells + cpu_cells]);
+		if (size_cells == 2) {
+			size <<= 32;
+			size |= fdt32_to_cpu(ranges[i + pci_cells + cpu_cells + 1]);
+		}
+
+		/*
+		 * Bits [25:24] of PCI flags defines space code
+		 * 0b10 is 32-bit MEM and 0b11 is 64-bit MEM.
+		 * Check for any type of PCIe MEM mapping.
+		 */
+		if (!((pci_flags & 0x02000000) &&
+		      cpu_addr == CONFIG_SYS_PCIE3_MEM_PHYS &&
+		      size > SZ_2M))
+			continue;
+
+		printf("Decreasing PCIe MEM size for 3rd PCIe controller to 2 MB\n");
+		idx = i + pci_cells + cpu_cells;
+		if (size_cells == 2) {
+			ret = fdt_setprop_inplace_u32_partial(blob, node,
+							      "ranges", idx, 0);
+			if (ret)
+				goto err;
+			idx++;
+		}
+		ret = fdt_setprop_inplace_u32_partial(blob, node,
+						      "ranges", idx, SZ_2M);
+		if (ret)
+			goto err;
+	}
+
+	/* Recursively fix also all subnodes */
+	fdt_for_each_subnode(subnode, blob, node)
+		fdt_fixup_pcie3_mem_size(blob, subnode);
+
+	return;
+
+err:
+	printf("Error: Cannot update \"ranges\" property\n");
+}
+
+void ft_memory_setup(void *blob, struct bd_info *bd)
+{
+	int node;
+
+	fdt_fixup_memory(blob, env_get_bootm_low(), env_get_bootm_size());
+
+	fdt_for_each_node_by_compatible(node, blob, -1, "fsl,mpc8548-pcie")
+		fdt_fixup_pcie3_mem_size(blob, node);
+}
+
 static int detect_model_serial(const char **model, char serial[17])
 {
 	u32 version_num;
