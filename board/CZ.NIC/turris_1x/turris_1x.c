@@ -5,8 +5,14 @@
 #include <init.h>
 #include <env.h>
 #include <fdt_support.h>
+#include <image.h>
+#include <asm/fsl_law.h>
+#include <asm/global_data.h>
+#include <asm/mmu.h>
 
 #include "../turris_atsha_otp.h"
+
+DECLARE_GLOBAL_DATA_PTR;
 
 /*
  * Reset time cycle register provided by Turris CPLD firmware.
@@ -25,6 +31,52 @@
 #define TURRIS_CPLD_LED_BRIGHTNESS_REG_FIRST	((void *)CONFIG_SYS_CPLD_BASE + 0x13)
 #define TURRIS_CPLD_LED_BRIGHTNESS_REG_LAST	((void *)CONFIG_SYS_CPLD_BASE + 0x1e)
 #define TURRIS_CPLD_LED_SW_OVERRIDE_REG		((void *)CONFIG_SYS_CPLD_BASE + 0x22)
+
+int dram_init_banksize(void)
+{
+	phys_size_t size = gd->ram_size;
+
+	static_assert(CONFIG_NR_DRAM_BANKS >= 3);
+
+	gd->bd->bi_dram[0].start = gd->ram_base;
+	gd->bd->bi_dram[0].size = get_effective_memsize();
+	size -= gd->bd->bi_dram[0].size;
+
+	/* Note: This address space is not mapped via TLB entries in U-Boot */
+
+	if (size > 0) {
+		/*
+		 * Setup additional overlapping 1 GB DDR LAW at the end of
+		 * 32-bit physical address space. It overlaps with all other
+		 * peripherals on P2020 mapped to physical address space.
+		 * But this is not issue because documentation says:
+		 * P2020 QorIQ Integrated Processor Reference Manual,
+		 * section 2.3.1 Precedence of local access windows:
+		 * If two local access windows overlap, the lower
+		 * numbered window takes precedence.
+		 */
+		if (set_ddr_laws(0xc0000000, SZ_1G, LAW_TRGT_IF_DDR_1) < 0) {
+			printf("Error: Cannot setup DDR LAW for more than 2 GB\n");
+			return 0;
+		}
+	}
+
+	if (size > 0) {
+		/* Free space between PCIe bus 3 MEM and NOR */
+		gd->bd->bi_dram[1].start = 0xc0200000;
+		gd->bd->bi_dram[1].size = min(size, 0xef000000 - gd->bd->bi_dram[1].start);
+		size -= gd->bd->bi_dram[1].size;
+	}
+
+	if (size > 0) {
+		/* Free space between NOR and NAND */
+		gd->bd->bi_dram[2].start = 0xf0000000;
+		gd->bd->bi_dram[2].size = min(size, 0xff800000 - gd->bd->bi_dram[2].start);
+		size -= gd->bd->bi_dram[2].size;
+	}
+
+	return 0;
+}
 
 static inline int fdt_setprop_inplace_u32_partial(void *blob, int node,
 						  const char *name,
@@ -137,9 +189,22 @@ err:
 
 void ft_memory_setup(void *blob, struct bd_info *bd)
 {
+	u64 start[CONFIG_NR_DRAM_BANKS];
+	u64 size[CONFIG_NR_DRAM_BANKS];
+	int count;
 	int node;
 
-	fdt_fixup_memory(blob, env_get_bootm_low(), env_get_bootm_size());
+	if (!env_get("bootm_low") && !env_get("bootm_size")) {
+		for (count = 0; count < CONFIG_NR_DRAM_BANKS; count++) {
+			start[count] = gd->bd->bi_dram[count].start;
+			size[count] = gd->bd->bi_dram[count].size;
+			if (!size[count])
+				break;
+		}
+		fdt_fixup_memory_banks(blob, start, size, count);
+	} else {
+		fdt_fixup_memory(blob, env_get_bootm_low(), env_get_bootm_size());
+	}
 
 	fdt_for_each_node_by_compatible(node, blob, -1, "fsl,mpc8548-pcie")
 		fdt_fixup_pcie3_mem_size(blob, node);
