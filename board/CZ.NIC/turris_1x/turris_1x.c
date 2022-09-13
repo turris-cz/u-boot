@@ -147,10 +147,7 @@ static void handle_reset_button(void)
 	else
 		reset_time = 0;
 
-	if (reset_time > 0)
-		env_set_ulong("turris_reset", reset_time);
-	else
-		env_set("turris_reset", NULL);
+	env_set_ulong("turris_reset", reset_time);
 
 	/* Check if red reset button was hold for at least six seconds. */
 	if (reset_time >= 6) {
