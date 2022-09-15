@@ -18,7 +18,7 @@
  * 0xf8f8_0000 - 0xf8ff_ffff  512 kB  L2 SRAM             cacheable (early boot, SD card only)
  * 0xf900_0000 - 0xff6f_ffff  103 MB  unused
  * 0xff70_0000 - 0xff7f_ffff    1 MB  CCSR                non-cacheable (SPL only)
- * 0xff80_0000 - 0xff80_7fff   32 kB  NAND (CS1)          non-cacheable
+ * 0xff80_0000 - 0xff83_ffff  256 kB  NAND (CS1)          non-cacheable
  * 0xffa0_0000 - 0xffa1_ffff  128 kB  CPLD (CS3)          non-cacheable
  * 0xffc0_0000 - 0xffc2_ffff  192 kB  PCIe IO             non-cacheable
  * 0xffd0_0000 - 0xffd0_3fff   16 kB  L1 stack            cacheable (early boot)
