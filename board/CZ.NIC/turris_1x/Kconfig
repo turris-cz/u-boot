@@ -46,6 +46,8 @@ config SYS_RELOC_GD_ENV_ADDR
 # DDR
 config DDR_CLK_FREQ
 	default 66666666
+config NR_DRAM_BANKS
+	default 5
 
 # UART
 config DEBUG_UART_BASE

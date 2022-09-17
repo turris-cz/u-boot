@@ -9,6 +9,8 @@
 #include <asm/fsl_law.h>
 #include <asm/global_data.h>
 #include <asm/mmu.h>
+#include <dm/device.h>
+#include <dm/ofnode.h>
 
 #include "../turris_atsha_otp.h"
 
@@ -90,8 +92,9 @@ static inline int fdt_setprop_inplace_u32_partial(void *blob, int node,
 						   &val, sizeof(u32));
 }
 
-/* Decrease size of 3rd PCIe controller MEM in "ranges" DT to 2MB recursively */
-static void fdt_fixup_pcie3_mem_size(void *blob, int node)
+/* Setup correct size of PCIe controller MEM in DT "ranges" property recursively */
+static void fdt_fixup_pcie_mem_size(void *blob, int node, phys_size_t pcie1_mem,
+				    phys_size_t pcie2_mem, phys_size_t pcie3_mem)
 {
 	int pci_cells, cpu_cells, size_cells;
 	const u32 *ranges;
@@ -100,6 +103,8 @@ static void fdt_fixup_pcie3_mem_size(void *blob, int node)
 	u32 pci_flags;
 	u64 cpu_addr;
 	u64 size;
+	u64 new_size;
+	int pcie_id;
 	int idx;
 	int subnode;
 	int ret;
@@ -157,12 +162,25 @@ static void fdt_fixup_pcie3_mem_size(void *blob, int node)
 		 * 0b10 is 32-bit MEM and 0b11 is 64-bit MEM.
 		 * Check for any type of PCIe MEM mapping.
 		 */
-		if (!((pci_flags & 0x02000000) &&
-		      cpu_addr == CONFIG_SYS_PCIE3_MEM_PHYS &&
-		      size > SZ_2M))
+		if (!(pci_flags & 0x02000000))
 			continue;
 
-		printf("Decreasing PCIe MEM size for 3rd PCIe controller to 2 MB\n");
+		if (cpu_addr == CONFIG_SYS_PCIE1_MEM_PHYS && size > pcie1_mem) {
+			pcie_id = 1;
+			new_size = pcie1_mem;
+		} else if (cpu_addr == CONFIG_SYS_PCIE2_MEM_PHYS && size > pcie2_mem) {
+			pcie_id = 2;
+			new_size = pcie2_mem;
+		} else if (cpu_addr == CONFIG_SYS_PCIE3_MEM_PHYS && size > pcie3_mem) {
+			pcie_id = 3;
+			new_size = pcie3_mem;
+		} else {
+			continue;
+		}
+
+		printf("Decreasing PCIe MEM %d size from ", pcie_id);
+		print_size(size, " to ");
+		print_size(new_size, "\n");
 		idx = i + pci_cells + cpu_cells;
 		if (size_cells == 2) {
 			ret = fdt_setprop_inplace_u32_partial(blob, node,
@@ -179,7 +197,7 @@ static void fdt_fixup_pcie3_mem_size(void *blob, int node)
 
 	/* Recursively fix also all subnodes */
 	fdt_for_each_subnode(subnode, blob, node)
-		fdt_fixup_pcie3_mem_size(blob, subnode);
+		fdt_fixup_pcie_mem_size(blob, subnode, pcie1_mem, pcie2_mem, pcie3_mem);
 
 	return;
 
@@ -187,8 +205,20 @@ err:
 	printf("Error: Cannot update \"ranges\" property\n");
 }
 
+static inline phys_size_t get_law_size(phys_addr_t addr, enum law_trgt_if id)
+{
+	struct law_entry e;
+
+	e = find_law_by_addr_id(addr, id);
+	if (e.index < 0)
+		return 0;
+
+	return 2ULL << e.size;
+}
+
 void ft_memory_setup(void *blob, struct bd_info *bd)
 {
+	phys_size_t pcie1_mem, pcie2_mem, pcie3_mem;
 	u64 start[CONFIG_NR_DRAM_BANKS];
 	u64 size[CONFIG_NR_DRAM_BANKS];
 	int count;
@@ -206,8 +236,12 @@ void ft_memory_setup(void *blob, struct bd_info *bd)
 		fdt_fixup_memory(blob, env_get_bootm_low(), env_get_bootm_size());
 	}
 
+	pcie1_mem = get_law_size(CONFIG_SYS_PCIE1_MEM_PHYS, LAW_TRGT_IF_PCIE_1);
+	pcie2_mem = get_law_size(CONFIG_SYS_PCIE2_MEM_PHYS, LAW_TRGT_IF_PCIE_2);
+	pcie3_mem = get_law_size(CONFIG_SYS_PCIE3_MEM_PHYS, LAW_TRGT_IF_PCIE_3);
+
 	fdt_for_each_node_by_compatible(node, blob, -1, "fsl,mpc8548-pcie")
-		fdt_fixup_pcie3_mem_size(blob, node);
+		fdt_fixup_pcie_mem_size(blob, node, pcie1_mem, pcie2_mem, pcie3_mem);
 }
 
 static int detect_model_serial(const char **model, char serial[17])
@@ -371,8 +405,153 @@ static void handle_reset_button(void)
 	}
 }
 
+static int recalculate_pcie_mem_law(phys_addr_t addr,
+				    pci_size_t pcie_size,
+				    enum law_trgt_if id,
+				    phys_addr_t *free_start,
+				    phys_size_t *free_size)
+{
+	phys_size_t cur_size, new_size;
+	struct law_entry e;
+
+	e = find_law_by_addr_id(addr, id);
+	if (e.index < 0) {
+		*free_start = *free_size = 0;
+		return 0;
+	}
+
+	cur_size = 2ULL << e.size;
+	new_size = roundup_pow_of_two(pcie_size);
+
+	if (new_size >= cur_size) {
+		*free_start = *free_size = 0;
+		return 0;
+	}
+
+	set_law(e.index, addr, law_size_bits(new_size), id);
+
+	*free_start = addr + new_size;
+	*free_size = cur_size - new_size;
+	return 1;
+}
+
+static void recalculate_used_pcie_mem(void)
+{
+	phys_addr_t free_start1, free_start2;
+	phys_size_t free_size1, free_size2;
+	pci_size_t pcie1_used_mem_size;
+	pci_size_t pcie2_used_mem_size;
+	struct law_entry e;
+	phys_size_t size;
+	ofnode node;
+	int i;
+
+	size = gd->ram_size;
+
+	for (i = 0; i < CONFIG_NR_DRAM_BANKS; i++)
+		size -= gd->bd->bi_dram[i].size;
+
+	if (size == 0)
+		return;
+
+	e = find_law_by_addr_id(CONFIG_SYS_PCIE3_MEM_PHYS, LAW_TRGT_IF_PCIE_3);
+	if (e.index < 0 && gd->bd->bi_dram[1].size > 0) {
+		/*
+		 * If there is no LAW for PCIe 3 MEM then 3rd PCIe controller
+		 * is inactive, which is the case for Turris 1.0 boards. So
+		 * use its reserved 2 MB physical space for DDR RAM.
+		 */
+		unsigned bank_size = SZ_2M;
+		if (bank_size > size)
+			bank_size = size;
+		printf("Reserving unused ");
+		print_size(bank_size, "");
+		printf(" of PCIe 3 MEM for DDR RAM\n");
+		gd->bd->bi_dram[1].start -= bank_size;
+		gd->bd->bi_dram[1].size += bank_size;
+		size -= bank_size;
+		if (size == 0)
+			return;
+	}
+
+#ifdef CONFIG_PCI_PNP
+	/*
+	 * Detect how much space of PCIe MEM is needed for both PCIe 1 and
+	 * PCIe 2 controllers with all connected cards on whole hierarchy.
+	 * This works only when U-Boot has enabled PCI PNP code which scans
+	 * all PCI devices and calulate required memory for every PCI BAR of
+	 * every PCI device.
+	 */
+	ofnode_for_each_compatible_node(node, "fsl,mpc8548-pcie") {
+		struct udevice *dev;
+		if (device_find_global_by_ofnode(node, &dev))
+			continue;
+		struct pci_controller *hose = dev_get_uclass_priv(pci_get_controller(dev));
+		if (!hose)
+			continue;
+		if (!hose->pci_mem)
+			continue;
+		if (!hose->pci_mem->size)
+			continue;
+		pci_size_t used_mem_size = hose->pci_mem->bus_lower - hose->pci_mem->bus_start;
+		if (hose->pci_mem->phys_start == CONFIG_SYS_PCIE1_MEM_PHYS)
+			pcie1_used_mem_size = used_mem_size;
+		else if (hose->pci_mem->phys_start == CONFIG_SYS_PCIE2_MEM_PHYS)
+			pcie2_used_mem_size = used_mem_size;
+	}
+
+	if (pcie1_used_mem_size == 0 && pcie2_used_mem_size == 0)
+		return;
+
+	e = find_law_by_addr_id(0xc0000000, LAW_TRGT_IF_DDR_1);
+	if (e.index < 0) {
+		printf("Error: Cannot setup DDR LAW for more than 3 GB of RAM\n");
+		return;
+	}
+
+	/*
+	 * Increase additional overlapping 1 GB DDR LAW from 1GB to 2GB by
+	 * moving its left side from 0xc0000000 to 0x80000000. After this
+	 * change it would overlap with PCIe MEM 1 and 2 LAWs.
+	 */
+	set_law(e.index, 0x80000000, LAW_SIZE_2G, LAW_TRGT_IF_DDR_1);
+
+	i = 3;
+	static_assert(CONFIG_NR_DRAM_BANKS >= 3+2);
+
+	if (recalculate_pcie_mem_law(CONFIG_SYS_PCIE2_MEM_PHYS,
+				     pcie2_used_mem_size, LAW_TRGT_IF_PCIE_2,
+				     &free_start2, &free_size2)) {
+		printf("Reserving unused ");
+		print_size(free_size2, "");
+		printf(" of PCIe 2 MEM for DDR RAM\n");
+		gd->bd->bi_dram[i].start = free_start2;
+		gd->bd->bi_dram[i].size = min(size, free_size2);
+		size -= gd->bd->bi_dram[i].start;
+		i++;
+		if (size == 0)
+			return;
+	}
+
+	if (recalculate_pcie_mem_law(CONFIG_SYS_PCIE1_MEM_PHYS,
+				     pcie1_used_mem_size, LAW_TRGT_IF_PCIE_1,
+				     &free_start1, &free_size1)) {
+		printf("Reserving unused ");
+		print_size(free_size1, "");
+		printf(" of PCIe 1 MEM for DDR RAM\n");
+		gd->bd->bi_dram[i].start = free_start1;
+		gd->bd->bi_dram[i].size = min(size, free_size1);
+		size -= gd->bd->bi_dram[i].size;
+		i++;
+		if (size == 0)
+			return;
+	}
+#endif
+}
+
 int last_stage_init(void)
 {
 	handle_reset_button();
+	recalculate_used_pcie_mem();
 	return 0;
 }
