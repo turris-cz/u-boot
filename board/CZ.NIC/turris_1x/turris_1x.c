@@ -13,7 +13,7 @@
  * Turris CPLD firmware is open source and available at:
  * https://gitlab.nic.cz/turris/hw/turris_cpld/-/blob/master/CZ_NIC_Router_CPLD.v
  */
-#define TURRIS_CPLD_RESET_TIME_CYCLE_REG	((void *)CONFIG_SYS_CPLD_BASE + 0x1f)
+#define TURRIS_CPLD_RESET_TIME_CYCLE_REG	((void *)CFG_SYS_CPLD_BASE + 0x1f)
 #define  TURRIS_CPLD_RESET_TIME_CYCLE_300MS	BIT(0)
 #define  TURRIS_CPLD_RESET_TIME_CYCLE_1S	BIT(1)
 #define  TURRIS_CPLD_RESET_TIME_CYCLE_2S	BIT(2)
@@ -22,9 +22,9 @@
 #define  TURRIS_CPLD_RESET_TIME_CYCLE_5S	BIT(5)
 #define  TURRIS_CPLD_RESET_TIME_CYCLE_6S	BIT(6)
 
-#define TURRIS_CPLD_LED_BRIGHTNESS_REG_FIRST	((void *)CONFIG_SYS_CPLD_BASE + 0x13)
-#define TURRIS_CPLD_LED_BRIGHTNESS_REG_LAST	((void *)CONFIG_SYS_CPLD_BASE + 0x1e)
-#define TURRIS_CPLD_LED_SW_OVERRIDE_REG		((void *)CONFIG_SYS_CPLD_BASE + 0x22)
+#define TURRIS_CPLD_LED_BRIGHTNESS_REG_FIRST	((void *)CFG_SYS_CPLD_BASE + 0x13)
+#define TURRIS_CPLD_LED_BRIGHTNESS_REG_LAST	((void *)CFG_SYS_CPLD_BASE + 0x1e)
+#define TURRIS_CPLD_LED_SW_OVERRIDE_REG		((void *)CFG_SYS_CPLD_BASE + 0x22)
 
 static int detect_model_serial(const char **model, char serial[17])
 {
@@ -89,33 +89,6 @@ int misc_init_r(void)
 {
 	turris_atsha_otp_init_mac_addresses(0);
 	turris_atsha_otp_init_serial_number();
-	return 0;
-}
-
-int show_board_info(void)
-{
-	const char *model;
-	char serial[17];
-	void *reg;
-	int err;
-
-	/* Disable software control of all Turris LEDs */
-	out_8(TURRIS_CPLD_LED_SW_OVERRIDE_REG, 0x00);
-
-	/* Reset colors of all Turris LEDs to their default values */
-	for (reg = TURRIS_CPLD_LED_BRIGHTNESS_REG_FIRST;
-	     reg <= TURRIS_CPLD_LED_BRIGHTNESS_REG_LAST;
-	     reg++)
-		out_8(reg, 0xff);
-
-	detect_model_serial(&model, serial);
-	printf("Model: %s\n", model);
-	printf("Serial Number: %s\n", serial);
-
-	err = checkboard();
-	if (err)
-		return err;
-
 	return 0;
 }
 

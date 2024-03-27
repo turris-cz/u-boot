@@ -8,7 +8,7 @@
 #ifdef CFG_RESET_VECTOR_ADDRESS
 #define RESET_VECTOR_ADDRESS	CFG_RESET_VECTOR_ADDRESS
 #else
-#define RESET_VECTOR_ADDRESS	0xfffffffc
+#define RESET_VECTOR_ADDRESS	0xeffffffc
 #endif
 
 OUTPUT_ARCH(powerpc)

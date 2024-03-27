@@ -28,7 +28,6 @@ config CMD_ERRATA
 config FSL_PREPBL_ESDHC_BOOT_SECTOR
 	bool "Generate QorIQ pre-PBL eSDHC boot sector"
 	depends on MPC85xx
-	depends on SDCARD
 	help
 	  With this option final image would have prepended QorIQ pre-PBL eSDHC
 	  boot sector suitable for SD card images. This boot sector instruct
@@ -177,6 +176,7 @@ config TARGET_TURRIS_1X
 	bool "Support Turris 1.x"
 	select SUPPORT_SPL
 	select ARCH_P2020
+	select SYS_L2_SIZE_512KB
 
 config TARGET_P2041RDB
 	bool "Support P2041RDB"

@@ -116,7 +116,7 @@ bootsect:
 	.long (CONFIG_FSL_PREPBL_ESDHC_BOOT_SECTOR_START + CONFIG_FSL_PREPBL_ESDHC_BOOT_SECTOR_DATA) * 512
 
 	.org 0x58 /* Target address in the system's local memory address space */
-	.long CONFIG_SYS_MONITOR_BASE
+	.long CONFIG_VAL(SYS_MONITOR_BASE)
 
 	.org 0x60 /* Execution starting address */
 	.long _start
@@ -179,34 +179,6 @@ _start:
 	 */
 	mr	r24, r3
 
-#ifdef CONFIG_SYS_FSL_ERRATUM_A004510
-	mfspr	r3,SPRN_SVR
-	rlwinm	r3,r3,0,0xff
-	li	r4,CONFIG_SYS_FSL_ERRATUM_A004510_SVR_REV
-	cmpw	r3,r4
-	beq	1f
-
-#ifdef CONFIG_SYS_FSL_ERRATUM_A004510_SVR_REV2
-	li	r4,CONFIG_SYS_FSL_ERRATUM_A004510_SVR_REV2
-	cmpw	r3,r4
-	beq	1f
-#endif
-
-	/* Not a supported revision affected by erratum */
-	li	r27,0
-	b	2f
-
-1:	li	r27,1	/* Remember for later that we have the erratum */
-	/* Erratum says set bits 55:60 to 001001 */
-	msync
-	isync
-	mfspr	r3,SPRN_HDBCR0
-	li	r4,0x48
-	rlwimi	r3,r4,0,0x1f8
-	mtspr	SPRN_HDBCR0,r3
-	isync
-2:
-#endif
 #ifdef CONFIG_SYS_FSL_ERRATUM_A005125
 	msync
 	isync
@@ -215,46 +187,6 @@ _start:
 	mtspr	SPRN_HDBCR0, r3
 #endif
 
-
-#if defined(CONFIG_NXP_ESBC) && defined(CONFIG_E500MC) && \
-	!defined(CONFIG_E6500)
-	/* ISBC uses L2 as stack.
-	 * Disable L2 cache here so that u-boot can enable it later
-	 * as part of it's normal flow
-	*/
-
-	/* Check if L2 is enabled */
-	mfspr	r3, SPRN_L2CSR0
-	lis	r2, L2CSR0_L2E@h
-	ori	r2, r2, L2CSR0_L2E@l
-	and.	r4, r3, r2
-	beq	l2_disabled
-
-	mfspr r3, SPRN_L2CSR0
-	/* Flush L2 cache */
-	lis     r2,(L2CSR0_L2FL)@h
-	ori     r2, r2, (L2CSR0_L2FL)@l
-	or      r3, r2, r3
-	sync
-	isync
-	mtspr   SPRN_L2CSR0,r3
-	isync
-1:
-	mfspr r3, SPRN_L2CSR0
-	and. r1, r3, r2
-	bne 1b
-
-	mfspr r3, SPRN_L2CSR0
-	lis r2, L2CSR0_L2E@h
-	ori r2, r2, L2CSR0_L2E@l
-	andc r4, r3, r2
-	sync
-	isync
-	mtspr SPRN_L2CSR0,r4
-	isync
-
-l2_disabled:
-#endif
 
 /* clear registers/arrays not reset by hardware */
 
@@ -265,6 +197,8 @@ l2_disabled:
 
 	mfspr	r1,DBSR
 	mtspr	DBSR,r1		/* Clear all valid bits */
+	
+	
 
 
 	.macro	create_tlb1_entry esel ts tsize epn wimg rpn perm phy_high scratch
@@ -337,6 +271,20 @@ l2_disabled:
 	tlbwe
 	isync
 	.endm
+
+/*
+	create_tlb1_entry 1, \
+		0, BOOKE_PAGESZ_1M, \
+		CFG_SYS_CCSRBAR, MAS2_I|MAS2_G, \
+		CFG_SYS_CCSRBAR_PHYS_LOW, MAS3_SW|MAS3_SR, \
+		CFG_SYS_CCSRBAR_PHYS_HIGH, r3
+	
+	lis	r7, (CFG_SYS_CCSRBAR + 0x4500)@h
+	ori	r7, r7, (CFG_SYS_CCSRBAR + 0x4500)@l
+	lis	r6, 0x41414141@h
+	ori	r6, r6, 0x41414141@l
+	stb r6, 0(r7)
+*/
 
 /* Interrupt vectors do not fit in minimal SPL. */
 #if !defined(MINIMAL_SPL)

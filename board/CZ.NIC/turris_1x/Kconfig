@@ -100,8 +100,6 @@ config USB_XHCI_PCI
 # SDHC
 config FSL_ESDHC
 	default y
-config FSL_PREPBL_ESDHC_BOOT_SECTOR
-	default y if SYS_EXTRA_OPTIONS = SDCARD
 config SYS_FSL_ESDHC_DEFAULT_BUS_WIDTH
 	default 4
 
@@ -126,26 +124,14 @@ config BCH
 	default y
 config SYS_FLASH_CFI
 	default y
-
-config MPC85XX_HAVE_RESET_VECTOR
-	default y if SYS_EXTRA_OPTIONS != SDCARD
-
-config OF_INITIAL_DTB_READONLY
-	default y if SYS_EXTRA_OPTIONS != SDCARD
+config NAND_ECC_BCH
+	default y
+endif
 
 config SYS_LOAD_ADDR
 	default 0x1000000
 
-config SYS_TEXT_BASE
-	default 0x11000000 if SPL # in DDR
-	default 0xf8f80000 if SYS_EXTRA_OPTIONS = SDCARD # in SRAM
-	default 0xeff40000 # in NOR
-
 if SPL
-
-config SPL_TEXT_BASE
-	default 0xf8f80000 if SYS_EXTRA_OPTIONS = SDCARD # in SRAM
-	default 0xeff40000 # in NOR
 
 config SPL_ENV_SUPPORT
 	default y
@@ -157,17 +143,11 @@ config SPL_LIBCOMMON_SUPPORT
 	default y
 config SPL_LIBGENERIC_SUPPORT
 	default y
-config SPL_MMC
-	default y if SYS_EXTRA_OPTIONS = SDCARD
-config SPL_MMC_BOOT
-	default y if SYS_EXTRA_OPTIONS = SDCARD
 config SPL_MPC8XXX_INIT_DDR
 	default y
 config SPL_SERIAL
 	default y
 config SPL_SYS_I2C_LEGACY
 	default y
-
-endif
 
 endif
